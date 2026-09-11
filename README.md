@@ -1,5 +1,5 @@
-# app-rally
+# Rally
 
-Rally — Vidalia tennis and pickleball. Host: https://rally.unitedundergod.org
+Tennis and pickleball, managed in one place.
 
-This is the booking door, not a second coaching platform. Lessons, hitting partners, and court time go through the form on the homepage. Pay at the court or a card link after the time is locked.
+Live: https://rally.unitedundergod.org

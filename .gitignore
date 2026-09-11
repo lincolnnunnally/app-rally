@@ -1,0 +1,15 @@
+node_modules/
+.vercel/
+screenshots/
+artifacts/
+.grok/skills/
+.grok/references/
+.grok/*.png
+.grok/*.log
+.grok/status
+dist/
+*.local
+.DS_Store
+
+.tanstack/
+.project_id

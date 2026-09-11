@@ -602,8 +602,9 @@ async function ensureShareCode(sql: Sql, userId: string, displayName: string) {
   `;
 	if (existing[0]?.share_code) return String(existing[0].share_code);
 	const base = slugify(displayName).replace(/-/g, "").slice(0, 12) || "player";
+	const preferred = /lincoln/i.test(displayName) ? ["lincoln", base] : [base];
 	for (let i = 0; i < 12; i += 1) {
-		const code = i === 0 ? base : `${base}${i + 1}`;
+		const code = i < preferred.length ? preferred[i]! : `${base}${i + 1}`;
 		if (num((await sql`
       select count(*)::int as n from profiles where share_code = ${code}
     `)[0]?.n ?? 0) === 0) {
@@ -854,7 +855,8 @@ var profileInput = z.object({
 	pickleball_results: z.string().max(400).optional(),
 	credit_coach_user_id: z.string().max(80).optional(),
 	coach_note: z.string().max(240).optional(),
-	referred_by: z.string().max(32).optional()
+	referred_by: z.string().max(32).optional(),
+	coach_code: z.string().max(32).optional()
 });
 export const saveProfile = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(profileInput).handler(async ({ context, data }) => {
 	const sql = await getSql();
@@ -953,6 +955,39 @@ export const saveProfile = createServerFn({ method: "POST" }).middleware([authMi
           set referred_by = coalesce(referred_by, ${String(owner[0].user_id)})
           where user_id = ${context.userId}
         `;
+	}
+	const coachCode = (data.coach_code || "").trim().toLowerCase();
+	if (coachCode) {
+		const coach = await sql`
+        select user_id, display_name from profiles
+        where lower(share_code) = ${coachCode}
+          and is_coach = true
+          and onboarded = true
+          and user_id <> ${context.userId}
+          and user_id not like 'seed:%'
+        limit 1
+      `;
+		if (coach[0]) {
+			const coachId = String(coach[0].user_id);
+			await sql`
+        update profiles
+        set
+          credit_coach_user_id = coalesce(credit_coach_user_id, ${coachId}),
+          looking_for_coach = true,
+          looking_for_partners = true
+        where user_id = ${context.userId}
+      `;
+			const joiner = await sql`
+        select display_name from profiles where user_id = ${context.userId} limit 1
+      `;
+			await notify(
+				sql,
+				coachId,
+				"New player from your invite",
+				`${joiner[0]?.display_name ?? "A player"} joined Rally from your QR / link. They are on your list and looking for hitting partners too.`,
+				"/app/desk",
+			);
+		}
 	}
 	return mapProfile((await sql`
       select p.*, c.display_name as credit_coach_name
@@ -2343,7 +2378,10 @@ export const catalogCourt = createServerFn({ method: "GET" }).validator(z.object
 	if (citySlug(court.city) !== citySlug(data.city)) return null;
 	return court;
 });
-export const lookupShare = createServerFn({ method: "GET" }).validator(z.object({ code: z.string().min(1).max(32) })).handler(async ({ data }) => {
+export const lookupShare = createServerFn({ method: "GET" }).validator(z.object({
+	code: z.string().min(1).max(32),
+	as_coach: z.boolean().optional()
+})).handler(async ({ data }) => {
 	const sql = await getSql();
 	await ensureSeed(sql);
 	const rows = await sql`
@@ -2354,6 +2392,7 @@ export const lookupShare = createServerFn({ method: "GET" }).validator(z.object(
 	if (!rows[0]) return null;
 	const p = mapProfile(rows[0]);
 	if (p.user_id.startsWith("seed:")) return null;
+	if (data.as_coach && !p.is_coach) return null;
 	return publicOf(p);
 });
 

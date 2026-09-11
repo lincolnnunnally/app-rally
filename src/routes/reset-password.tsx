@@ -94,7 +94,7 @@ function ResetPasswordPage() {
               This reset link is missing, expired, or already used.
             </p>
             <Button asChild className="mt-4 w-full">
-              <Link to="/login" search={{ ref: undefined, mode: "in" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "in" }}>
                 Request a new link
               </Link>
             </Button>

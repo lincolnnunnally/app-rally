@@ -139,7 +139,7 @@ function CityPage() {
 
       <div className="mt-10 flex flex-wrap gap-2">
         <Button asChild>
-          <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+          <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
             Join to reserve
           </Link>
         </Button>

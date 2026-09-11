@@ -9,6 +9,7 @@ import { PlayerSportCards } from "@/components/player-proof";
 import {
   LEVELS,
   PLAY_FREQUENCY,
+  readCoach,
   readRef,
   type Profile,
 } from "@/lib/rally";
@@ -110,8 +111,6 @@ export function Onboarding({
           plays_pickleball: pickleball,
           tennis_level: tennis ? tennisLevel : undefined,
           pickleball_level: pickleball ? pbLevel : undefined,
-          looking_for_partners: partners,
-          looking_for_coach: coach,
           interested_in_leagues: leagues,
           is_coach: isCoach,
           availability: availability || undefined,
@@ -127,9 +126,12 @@ export function Onboarding({
           pickleball_experience: pickleball && pbExp ? pbExp : undefined,
           tennis_results: tennis && tennisResults ? tennisResults : undefined,
           pickleball_results: pickleball && pbResults ? pbResults : undefined,
+          looking_for_partners: partners || Boolean(readCoach()),
+          looking_for_coach: coach || Boolean(readCoach()),
           credit_coach_user_id: creditCoach || undefined,
           coach_note: coachNote || undefined,
           referred_by: readRef() || undefined,
+          coach_code: readCoach() || undefined,
         },
       });
       onDone(profile);

@@ -47,7 +47,7 @@ export function SignedOut({ children }: { children: ReactNode }) {
  */
 export function RedirectToSignIn({ to = SIGN_IN_PATH }: { to?: string }) {
   if (to === "/login") {
-    return <Navigate to="/login" search={{ ref: undefined, mode: "in" }} />;
+    return <Navigate to="/login" search={{ ref: undefined, coach: undefined, mode: "in" }} />;
   }
   return <Navigate to={to} />;
 }

@@ -152,7 +152,7 @@ function CourtPage() {
             {user ? (
               <Link to="/app/courts">Reserve on Rally</Link>
             ) : (
-              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                 Reserve on Rally
               </Link>
             )}
@@ -167,7 +167,7 @@ function CourtPage() {
               {user ? (
                 <Link to="/app/courts">Hold a window</Link>
               ) : (
-                <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+                <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                   Join to hold a window
                 </Link>
               )}

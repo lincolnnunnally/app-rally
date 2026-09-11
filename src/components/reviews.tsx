@@ -49,7 +49,7 @@ export function ReviewBlock({
         />
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">
-          <Link to="/login" search={{ ref: undefined, mode: "up" }} className="underline">
+          <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }} className="underline">
             Sign in
           </Link>{" "}
           to review {noun}.

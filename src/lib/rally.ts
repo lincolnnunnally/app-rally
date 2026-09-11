@@ -54,6 +54,7 @@ export const RALLY = {
 } as const;
 
 export const REF_KEY = "rally_ref";
+export const COACH_KEY = "rally_coach";
 
 export const PLAY_FREQUENCY = [
   { value: "handful", label: "A handful of times" },
@@ -64,10 +65,10 @@ export const PLAY_FREQUENCY = [
 ] as const;
 export type PlayFrequency = (typeof PLAY_FREQUENCY)[number]["value"];
 
-export type LoginSearch = { ref?: string; mode?: "in" | "up" };
+export type LoginSearch = { ref?: string; coach?: string; mode?: "in" | "up" };
 
-export function loginSearch(mode?: "in" | "up", ref?: string): LoginSearch {
-  return { ref, mode };
+export function loginSearch(mode?: "in" | "up", ref?: string, coach?: string): LoginSearch {
+  return { ref, coach, mode };
 }
 
 
@@ -511,8 +512,23 @@ export function readRef() {
   return window.localStorage.getItem(REF_KEY) || "";
 }
 
+export function rememberCoach(code: string) {
+  if (typeof window === "undefined") return;
+  const c = code.trim().toLowerCase();
+  if (c) window.localStorage.setItem(COACH_KEY, c);
+}
+
+export function readCoach() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(COACH_KEY) || "";
+}
+
 export function sharePath(code: string) {
   return `/join?ref=${encodeURIComponent(code)}`;
+}
+
+export function coachInvitePath(code: string) {
+  return `/join?coach=${encodeURIComponent(code)}`;
 }
 
 export function bookingLabel(mode: string) {

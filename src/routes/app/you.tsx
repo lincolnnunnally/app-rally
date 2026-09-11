@@ -2,7 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Brain, GraduationCap, TrendingDown, Trophy, UserRound, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PlayerSportCards } from "@/components/player-proof";
-import { ShareRally } from "@/components/share-rally";
+import { CoachInvite, ShareRally } from "@/components/share-rally";
 import { UserButton } from "@/lib/auth/gates";
 import { useRally } from "@/lib/rally-context";
 
@@ -27,6 +27,11 @@ function You() {
           <PlayerSportCards player={profile} />
         </div>
       </Card>
+      {profile.is_coach ? (
+        <div className="mt-8">
+          <CoachInvite code={profile.share_code} coachName={profile.display_name} />
+        </div>
+      ) : null}
       <div className="mt-8">
         <ShareRally code={profile.share_code} creditCents={profile.credit_cents} />
       </div>

@@ -62,7 +62,7 @@ function ListACourt() {
             ? "Private court is on Rally. Join to reserve it from your board."
             : "That court is already on Rally.",
         );
-        await navigate({ to: "/login", search: { ref: undefined, mode: "up" } });
+        await navigate({ to: "/login", search: { ref: undefined, coach: undefined, mode: "up" } });
         return;
       }
       toast.success(
@@ -107,7 +107,7 @@ function ListACourt() {
               schools, and a court you already have a key to.
             </p>
             <Button asChild className="mt-4">
-              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                 Create an account
               </Link>
             </Button>

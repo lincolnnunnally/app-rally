@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { rememberRef } from "@/lib/rally";
+import { rememberCoach, rememberRef } from "@/lib/rally";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
     ref: typeof s.ref === "string" ? s.ref : undefined,
+    coach: typeof s.coach === "string" ? s.coach : undefined,
     mode: s.mode === "up" || s.mode === "in" ? s.mode : undefined,
   }),
   component: Login,
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const { user } = useCurrentUserState();
-  const { ref, mode: modeSearch } = Route.useSearch();
+  const { ref, coach, mode: modeSearch } = Route.useSearch();
   const [mode, setMode] = useState<"in" | "up">(modeSearch === "in" ? "in" : "up");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,7 +31,8 @@ function Login() {
 
   useEffect(() => {
     if (ref) rememberRef(ref);
-  }, [ref]);
+    if (coach) rememberCoach(coach);
+  }, [ref, coach]);
 
   if (user) return <Navigate to="/app" />;
 

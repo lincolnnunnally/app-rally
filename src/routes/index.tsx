@@ -56,7 +56,7 @@ function Home() {
             </Button>
           ) : (
             <Button asChild>
-              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                 Join
               </Link>
             </Button>
@@ -103,7 +103,7 @@ function Home() {
             </Button>
           ) : (
             <Button asChild size="lg" variant="outline">
-              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                 Join Rally
               </Link>
             </Button>
@@ -200,7 +200,7 @@ function Home() {
             {user ? (
               <Link to="/app/desk">Open a coach desk</Link>
             ) : (
-              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                 Open a coach desk
               </Link>
             )}

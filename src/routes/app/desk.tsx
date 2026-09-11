@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
-import { ShareRally } from "@/components/share-rally";
+import { CoachInvite, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
   RALLY,
@@ -108,6 +108,9 @@ function Desk() {
         </TabsList>
 
         <TabsContent value="board" className="mt-6">
+          <div className="mb-8">
+            <CoachInvite code={profile.share_code} coachName={profile.display_name} />
+          </div>
           <LogLessonForm
             courts={courts}
             people={directory.data ?? []}

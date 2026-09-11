@@ -28,7 +28,7 @@ export function PublicChrome({ children }: { children: ReactNode }) {
             </Button>
           ) : (
             <Button asChild>
-              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
                 Join
               </Link>
             </Button>

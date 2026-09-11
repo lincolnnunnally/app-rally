@@ -7,8 +7,10 @@ const SOUTH = 32.16;
 const NORTH = 32.26;
 
 function pinLabel(c: Court) {
-  if (c.name.includes("Vidalia Rec") && c.name.includes("Pickleball")) return "Rec PB";
-  if (c.name.includes("Vidalia Rec") && c.name.includes("Tennis")) return "Rec tennis";
+  if ((c.name.includes("Vidalia Rec") || c.name.includes("Ed Smith")) && c.name.includes("Pickleball"))
+    return "Rec PB";
+  if ((c.name.includes("Vidalia Rec") || c.name.includes("Ed Smith")) && c.name.includes("Tennis"))
+    return "Rec tennis";
   if (c.name.includes("Vidalia High")) return "High school";
   if (c.city === "Lyons") return "Lyons";
   const first = c.name.split(/[—–-]/)[0]?.trim() ?? c.name;

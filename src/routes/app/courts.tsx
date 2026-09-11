@@ -3,6 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CourtMap } from "@/components/court-map";
+import {
+  DirectionsButton,
+  DirectionsLink,
+  FacilityPhotoPicker,
+  FacilityThumb,
+} from "@/components/facility-place";
 import { useRally } from "@/lib/rally-context";
 import type { Court } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
@@ -109,14 +115,22 @@ function Courts() {
               onClick={() => setActive(c.id)}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-3 max-w-sm">
+                    <FacilityThumb court={c} />
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-display text-xl">{c.name}</h2>
                     <Badge variant="outline">{kindLabel(c.kind)}</Badge>
                     {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {c.address}, {c.city}
+                    <DirectionsLink
+                      court={c}
+                      className="underline decoration-border underline-offset-4 hover:text-foreground"
+                    >
+                      {c.address}, {c.city}
+                    </DirectionsLink>
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {c.sports.split(",").map((s) => (
@@ -183,15 +197,18 @@ function Courts() {
                     </p>
                   )}
                 </div>
+                <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                  <DirectionsButton court={c} size="sm" />
                 {c.status === "coming" || c.booking_mode === "walkup" ? (
                   c.manager_phone ? (
-                    <Button asChild variant="secondary">
+                    <Button asChild variant="secondary" size="sm">
                       <a href={`tel:${c.manager_phone}`}>Call</a>
                     </Button>
                   ) : null
                 ) : (
                   <ReserveDialog court={c} courts={courts} />
                 )}
+                </div>
               </div>
               <div className="mt-4 border-t border-border pt-4">
                 <p className="text-xs tracking-widest text-muted-foreground uppercase">Reserved</p>
@@ -342,10 +359,12 @@ function ReserveDialog({ court, courts }: { court: Court; courts: Court[] }) {
 
 function AddFacility({ onSaved }: { onSaved: () => void }) {
   const [open, setOpen] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
   const save = useMutation({
     mutationFn: (data: Parameters<typeof registerCourt>[0]["data"]) => registerCourt({ data }),
     onSuccess: () => {
       toast.success("Facility on the board.");
+      setPhoto(null);
       setOpen(false);
       onSaved();
     },
@@ -391,9 +410,11 @@ function AddFacility({ onSaved }: { onSaved: () => void }) {
               rules: String(f.get("rules") || "") || undefined,
               restrictions: String(f.get("restrictions") || "") || undefined,
               access_notes: String(f.get("access_notes") || "") || undefined,
+              photo_data: photo || undefined,
             });
           }}
         >
+          <FacilityPhotoPicker photo={photo} onChange={setPhoto} />
           <Field label="Name">
             <Input name="name" required placeholder="Meadows neighborhood courts" />
           </Field>

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { catalogCity } from "@/lib/rally-server";
+import { DirectionsButton, DirectionsLink, FacilityThumb } from "@/components/facility-place";
 import { bookingLabel, citySlug, kindLabel, money, sportLabel } from "@/lib/rally";
 
 export const Route = createFileRoute("/where/$city/")({
@@ -75,7 +76,9 @@ function CityPage() {
       <div className="mt-8 flex flex-col gap-3">
         {courts.map((c) => (
           <Card key={c.id}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="grid gap-4 sm:grid-cols-[14rem_1fr] sm:items-start">
+              <FacilityThumb court={c} />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
@@ -89,7 +92,12 @@ function CityPage() {
                   {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {c.address}, {c.city}, GA
+                  <DirectionsLink
+                    court={c}
+                    className="underline decoration-border underline-offset-4 hover:text-foreground"
+                  >
+                    {c.address}, {c.city}, GA
+                  </DirectionsLink>
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {c.sports.split(",").map((s) => (
@@ -104,14 +112,18 @@ function CityPage() {
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.rules}</p>
                 ) : null}
               </div>
-              <Button asChild variant="secondary">
-                <Link
-                  to="/where/$city/$slug"
-                  params={{ city: slug, slug: c.slug ?? citySlug(c.name) }}
-                >
-                  Court page
-                </Link>
-              </Button>
+              <div className="flex flex-col gap-2">
+                <DirectionsButton court={c} size="sm" />
+                <Button asChild variant="secondary" size="sm">
+                  <Link
+                    to="/where/$city/$slug"
+                    params={{ city: slug, slug: c.slug ?? citySlug(c.name) }}
+                  >
+                    Court page
+                  </Link>
+                </Button>
+              </div>
+              </div>
             </div>
           </Card>
         ))}

@@ -280,7 +280,54 @@ export type Court = {
   kind: string;
   status: string;
   slug: string | null;
+  photo_data: string | null;
 };
+
+export type CourtPlace = Pick<Court, "name" | "address" | "city" | "lat" | "lng">;
+
+export function courtDestination(c: CourtPlace) {
+  if (c.lat != null && c.lng != null) return `${c.lat},${c.lng}`;
+  const street = [c.address, c.city, "GA"].filter(Boolean).join(", ");
+  return street || c.name;
+}
+
+export function googleDirectionsHref(c: CourtPlace) {
+  const dest = encodeURIComponent(courtDestination(c));
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
+}
+
+export function appleMapsHref(c: CourtPlace) {
+  const dest = encodeURIComponent(courtDestination(c));
+  const q = encodeURIComponent(c.name);
+  return `https://maps.apple.com/?daddr=${dest}&q=${q}&dirflg=d`;
+}
+
+export function directionsHref(c: CourtPlace) {
+  return googleDirectionsHref(c);
+}
+
+export function preferAppleMaps() {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+export function osmEmbedSrc(c: CourtPlace) {
+  if (c.lat == null || c.lng == null) return null;
+  const pad = 0.012;
+  const bbox = [c.lng - pad, c.lat - pad, c.lng + pad, c.lat + pad].join(",");
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${c.lat}%2C${c.lng}`;
+}
+
+export function osmTileUrl(c: CourtPlace, zoom = 16) {
+  if (c.lat == null || c.lng == null) return null;
+  const n = 2 ** zoom;
+  const x = Math.floor(((c.lng + 180) / 360) * n);
+  const latRad = (c.lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
+  );
+  return `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
+}
 
 export type CatalogCity = {
   city: string;

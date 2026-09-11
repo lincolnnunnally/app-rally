@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FacilityPhotoPicker } from "@/components/facility-place";
 import { BOOKING_MODES, COURT_KINDS } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { submitCourt } from "@/lib/rally-server";
@@ -31,6 +32,7 @@ function ListACourt() {
   const navigate = useNavigate();
   const { user, isPending } = useCurrentUserState();
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,6 +56,7 @@ function ListACourt() {
           manager_phone: String(f.get("manager_phone") || "") || undefined,
           typical_hours: String(f.get("typical_hours") || "") || undefined,
           rules: String(f.get("rules") || "") || undefined,
+          photo_data: photo || undefined,
         },
       });
       if (!result.public || !result.slug) {
@@ -117,6 +120,7 @@ function ListACourt() {
         {user ? (
         <Card className="mt-8">
           <form className="flex flex-col gap-3" onSubmit={(e) => void onSubmit(e)}>
+            <FacilityPhotoPicker photo={photo} onChange={setPhoto} />
             <Field label="Court or facility name">
               <Input name="name" required placeholder="Meadows neighborhood courts" />
             </Field>

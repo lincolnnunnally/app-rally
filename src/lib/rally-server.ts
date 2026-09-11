@@ -812,7 +812,8 @@ function mapCourt(r: Record<string, unknown>): Court {
 		region: String(r.region ?? "Toombs"),
 		kind: String(r.kind ?? "public"),
 		status: String(r.status ?? "open"),
-		slug: r.slug == null ? null : String(r.slug)
+		slug: r.slug == null ? null : String(r.slug),
+		photo_data: r.photo_data == null ? null : String(r.photo_data)
 	};
 }
 function mapService(r: Record<string, unknown>): CoachService {
@@ -2159,7 +2160,8 @@ var courtSubmitZ = z.object({
 	restrictions: z.string().max(600).optional(),
 	access_notes: z.string().max(400).optional(),
 	lat: z.coerce.number().optional(),
-	lng: z.coerce.number().optional()
+	lng: z.coerce.number().optional(),
+	photo_data: z.string().max(450000).optional()
 });
 async function insertListedCourt(sql: Sql, data: {
 	name: string;
@@ -2186,6 +2188,7 @@ async function insertListedCourt(sql: Sql, data: {
 	lng?: number;
 	facility_cut_pct?: number;
 	lights_until?: string;
+	photo_data?: string;
 	addedBy: string | null;
 }) {
 	const dup = await sql`
@@ -2198,8 +2201,11 @@ async function insertListedCourt(sql: Sql, data: {
 		created: false
 	};
 	const city = data.city;
-	const lat = data.lat ?? (city.toLowerCase().includes("lyon") ? 32.2043 : 32.2174);
-	const lng = data.lng ?? (city.toLowerCase().includes("lyon") ? -82.3217 : -82.4132);
+	const cityKey = city.toLowerCase();
+	const lat = data.lat ?? (cityKey.includes("lyon") ? 32.2043 : cityKey.includes("vidalia") ? 32.2174 : null);
+	const lng = data.lng ?? (cityKey.includes("lyon") ? -82.3217 : cityKey.includes("vidalia") ? -82.4132 : null);
+	const photo = data.photo_data && data.photo_data.startsWith("data:image/") ? data.photo_data : null;
+	if (data.photo_data && !photo) throw new Error("Photo must be an image you upload.");
 	let slug = slugify(data.name) || `court-${Date.now()}`;
 	if (num((await sql`select count(*)::int as n from courts where slug = ${slug}`)[0]?.n ?? 0) > 0) slug = `${slug}-${Math.random().toString(36).slice(2, 5)}`;
 	const region = /vidalia|lyons|toombs/i.test(city) ? "Toombs" : city;
@@ -2210,7 +2216,7 @@ async function insertListedCourt(sql: Sql, data: {
       name, address, city, sports, indoor, court_count, surface, lights, restrooms,
       access_notes, typical_hours, phone, is_other, lat, lng, manager_name, manager_phone,
       manager_email, booking_mode, player_fee_cents, coach_fee_cents, facility_cut_pct,
-      rules, restrictions, lights_until, added_by, region, kind, status, slug
+      rules, restrictions, lights_until, added_by, region, kind, status, slug, photo_data
     ) values (
       ${data.name}, ${data.address}, ${city}, ${data.sports}, ${data.indoor}, ${data.court_count},
       ${data.surface ?? null}, ${data.lights}, ${data.restrooms}, ${data.access_notes ?? null},
@@ -2219,7 +2225,8 @@ async function insertListedCourt(sql: Sql, data: {
       ${data.manager_email ?? null}, ${data.booking_mode},
       ${Math.round((data.player_fee ?? 0) * 100)}, ${Math.round((data.coach_fee ?? 0) * 100)},
       ${data.facility_cut_pct ?? 0}, ${data.rules ?? null}, ${data.restrictions ?? null},
-      ${data.lights_until ?? null}, ${data.addedBy}, ${region}, ${data.kind}, 'open', ${slug}
+      ${data.lights_until ?? null}, ${data.addedBy}, ${region}, ${data.kind}, 'open', ${slug},
+      ${photo}
     )
     returning *
   `)[0]),
@@ -2255,6 +2262,21 @@ export const submitCourt = createServerFn({ method: "POST" }).middleware([authMi
 		public: !result.court.is_other,
 		booking_mode: result.court.booking_mode
 	};
+});
+export const saveCourtPhoto = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	photo_data: z.string().max(450000)
+})).handler(async ({ data }) => {
+	const photo = data.photo_data === "" ? null : data.photo_data;
+	if (photo && !photo.startsWith("data:image/")) throw new Error("Photo must be an image you upload.");
+	const sql = await getSql();
+	const rows = await sql`
+      update courts set photo_data = ${photo}
+      where id = ${data.id} and is_other = false
+      returning *
+    `;
+	if (!rows[0]) throw new Error("That court is not on the public board.");
+	return mapCourt(rows[0]);
 });
 export const saveCoachService = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	name: z.string().trim().min(2).max(80),

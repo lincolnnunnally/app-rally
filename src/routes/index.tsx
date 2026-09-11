@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { catalogCities, catalogCity } from "@/lib/rally-server";
+import { DirectionsLink, FacilityThumb } from "@/components/facility-place";
 import { bookingLabel, citySlug, kindLabel, sportLabel } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
@@ -142,26 +143,36 @@ function Home() {
             {courts
               .filter((c) => c.slug)
               .map((c) => (
-              <Link
-                key={c.id}
-                to="/where/$city/$slug"
-                params={{ city: citySlug(c.city), slug: c.slug! }}
-              >
-                <Card className="transition-colors duration-150 hover:border-primary/40">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-2xl">{c.name}</h3>
-                    <Badge variant="outline">{kindLabel(c.kind)}</Badge>
-                    {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
+                <Card key={c.id} className="transition-colors duration-150 hover:border-primary/40">
+                  <div className="grid gap-4 sm:grid-cols-[14rem_1fr] sm:items-start">
+                    <FacilityThumb court={c} />
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to="/where/$city/$slug"
+                          params={{ city: citySlug(c.city), slug: c.slug! }}
+                          className="font-display text-2xl hover:text-primary"
+                        >
+                          {c.name}
+                        </Link>
+                        <Badge variant="outline">{kindLabel(c.kind)}</Badge>
+                        {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        <DirectionsLink
+                          court={c}
+                          className="underline decoration-border underline-offset-4 hover:text-foreground"
+                        >
+                          {c.address}, {c.city}, GA
+                        </DirectionsLink>
+                      </p>
+                      <p className="mt-2 text-sm">
+                        {c.sports.split(",").map((s) => sportLabel(s.trim())).join(" · ")} ·{" "}
+                        {bookingLabel(c.booking_mode)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {c.address}, {c.city}, GA
-                  </p>
-                  <p className="mt-2 text-sm">
-                    {c.sports.split(",").map((s) => sportLabel(s.trim())).join(" · ")} ·{" "}
-                    {bookingLabel(c.booking_mode)}
-                  </p>
                 </Card>
-              </Link>
             ))}
           </div>
           <div className="mt-8 flex flex-wrap gap-3">

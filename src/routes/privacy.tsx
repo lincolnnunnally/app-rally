@@ -35,8 +35,8 @@ function PrivacyPage() {
             titles, trophies, competitions, city, whether you coach).
           </li>
           <li>
-            Court listings, reservations, open play RSVPs, partner requests, lessons, leagues,
-            reviews, and journal notes you write.
+            Court listings (including photos you add of a facility), reservations, open play
+            RSVPs, partner requests, lessons, leagues, reviews, and journal notes you write.
           </li>
           <li>Technical data needed to run the service (session cookies, basic device/browser info).</li>
         </ul>

@@ -1,11 +1,12 @@
-import { Link, createFileRoute, notFound } from "@tanstack/react-router";
+import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
 import { ShareListing } from "@/components/share-rally";
+import { DirectionsButton, DirectionsLink, FacilityHero } from "@/components/facility-place";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ReviewBlock } from "@/components/reviews";
-import { catalogCourt } from "@/lib/rally-server";
-import { bookingLabel, citySlug, kindLabel, money, sportLabel } from "@/lib/rally";
+import { catalogCourt, saveCourtPhoto } from "@/lib/rally-server";
+import { bookingLabel, citySlug, googleDirectionsHref, kindLabel, money, sportLabel } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/where/$city/$slug")({
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/where/$city/$slug")({
 
 function CourtPage() {
   const c = Route.useLoaderData();
+  const router = useRouter();
   const { user } = useCurrentUserState();
   const city = citySlug(c.city);
   const jsonLd = {
@@ -64,6 +66,7 @@ function CourtPage() {
       c.lat != null && c.lng != null
         ? { "@type": "GeoCoordinates", latitude: c.lat, longitude: c.lng }
         : undefined,
+    hasMap: googleDirectionsHref(c),
   };
 
   return (
@@ -85,7 +88,12 @@ function CourtPage() {
         {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
       </div>
       <p className="mt-2 text-sm text-muted-foreground">
-        {c.address}, {c.city}, GA
+        <DirectionsLink
+          court={c}
+          className="underline decoration-border underline-offset-4 hover:text-foreground"
+        >
+          {c.address}, {c.city}, GA
+        </DirectionsLink>
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {c.sports.split(",").map((s) => (
@@ -97,6 +105,21 @@ function CourtPage() {
         {c.lights ? <Badge variant="outline">Lights {c.lights_until ?? ""}</Badge> : null}
         {c.restrooms ? <Badge variant="outline">Restrooms</Badge> : null}
       </div>
+
+      <FacilityHero
+        court={c}
+        onPhoto={
+          user
+            ? (photo) => {
+                void saveCourtPhoto({ data: { id: c.id, photo_data: photo ?? "" } })
+                  .then(() => router.invalidate())
+                  .catch((err: unknown) => {
+                    window.alert(err instanceof Error ? err.message : "Could not save that photo.");
+                  });
+              }
+            : undefined
+        }
+      />
 
       <Card className="mt-8">
         <p className="text-sm">{bookingLabel(c.booking_mode)}</p>
@@ -180,6 +203,7 @@ function CourtPage() {
             </Link>
           </Button>
         )}
+        <DirectionsButton court={c} />
         <Button asChild variant="outline">
           <Link to="/list-a-court">List another court</Link>
         </Button>

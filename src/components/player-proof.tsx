@@ -1,3 +1,4 @@
+import { ProfileFace } from "@/components/profile-face";
 import type { PlayerProof, SportBits } from "@/lib/rally";
 import { sportLine, sportResults, sportStory } from "@/lib/rally";
 
@@ -57,12 +58,15 @@ export function PlayerProofBlock({
 }) {
   return (
     <div>
+      <div className="flex items-center gap-2">
+        <ProfileFace name={p.display_name} photo={p.photo_data} size="sm" />
       <p className="text-sm">
         {p.display_name}
         {sessions != null ? (
           <span className="text-muted-foreground"> · {sessions} sessions</span>
         ) : null}
       </p>
+      </div>
       <div className="mt-2">
         <PlayerSportCards player={p} compact />
       </div>

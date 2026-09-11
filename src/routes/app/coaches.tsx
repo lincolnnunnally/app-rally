@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
+import { ProfileFace } from "@/components/profile-face";
+import { ProofDisplay } from "@/components/proof-lists";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
 import { listCoaches, listMyLessons, requestLesson } from "@/lib/rally-server";
@@ -143,6 +145,7 @@ function CoachRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
+            <ProfileFace name={c.display_name} photo={c.photo_data} size="sm" />
             <h2 className="font-display text-xl">{c.display_name}</h2>
             {c.accepting ? <Badge variant="good">Accepting</Badge> : <Badge>Waitlist</Badge>}
             {c.city !== "Vidalia" ? <Badge variant="outline">{c.city}</Badge> : null}
@@ -168,12 +171,7 @@ function CoachRow({
           {c.specializations ? (
             <p className="mt-2 text-sm">{c.specializations}</p>
           ) : null}
-          {c.achievements ? (
-            <p className="mt-1 text-xs text-muted-foreground">{c.achievements}</p>
-          ) : null}
-          {c.certifications ? (
-            <p className="mt-1 text-xs text-muted-foreground">{c.certifications}</p>
-          ) : null}
+          <ProofDisplay certs={c.certs} honors={c.honors} />
           {c.students.length > 0 ? (
             <div className="mt-4 border-t border-border pt-3">
               <p className="text-xs tracking-widest text-muted-foreground uppercase">

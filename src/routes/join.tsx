@@ -2,6 +2,8 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { PublicChrome } from "@/components/public-chrome";
 import { PlayerSportCards } from "@/components/player-proof";
+import { ProfileFace } from "@/components/profile-face";
+import { ProofDisplay } from "@/components/proof-lists";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { rememberCoach, rememberRef } from "@/lib/rally";
@@ -70,13 +72,17 @@ function Join() {
         </p>
         {who ? (
           <Card className="mt-6">
-            <p className="font-display text-2xl">{who.display_name}</p>
+            <div className="flex items-center gap-3">
+              <ProfileFace name={who.display_name} photo={who.photo_data} />
+              <p className="font-display text-2xl">{who.display_name}</p>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {who.city}
               {asCoach ? " · coach" : ""}
             </p>
             <div className="mt-4">
               <PlayerSportCards player={who} />
+              <ProofDisplay certs={who.certs} honors={who.honors} />
             </div>
             {asCoach ? (
               <p className="mt-4 text-sm text-muted-foreground">

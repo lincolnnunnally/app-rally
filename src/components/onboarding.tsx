@@ -6,11 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerSportCards } from "@/components/player-proof";
+import { PhotoPicker } from "@/components/profile-face";
+import { CertEditor, HonorEditor, ProofDisplay } from "@/components/proof-lists";
 import {
   LEVELS,
   PLAY_FREQUENCY,
   readCoach,
   readRef,
+  type CertItem,
+  type HonorItem,
   type Profile,
 } from "@/lib/rally";
 import { listCoaches, saveProfile } from "@/lib/rally-server";
@@ -71,6 +75,9 @@ export function Onboarding({
   );
   const [creditCoach, setCreditCoach] = useState(existing?.credit_coach_user_id ?? "");
   const [coachNote, setCoachNote] = useState(existing?.coach_note ?? "");
+  const [photo, setPhoto] = useState<string | null>(existing?.photo_data ?? null);
+  const [certs, setCerts] = useState<CertItem[]>(existing?.certs ?? []);
+  const [honors, setHonors] = useState<HonorItem[]>(existing?.honors ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -132,6 +139,9 @@ export function Onboarding({
           coach_note: coachNote || undefined,
           referred_by: readRef() || undefined,
           coach_code: readCoach() || undefined,
+          photo_data: photo ?? "",
+          certs,
+          honors,
         },
       });
       onDone(profile);
@@ -155,6 +165,7 @@ export function Onboarding({
         “I coach” if you teach. A parent can book a kid later without the kid needing an account.
       </p>
       <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
+        <PhotoPicker name={displayName || "You"} photo={photo} onChange={setPhoto} />
         <Field label="Name">
           <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
         </Field>
@@ -316,11 +327,14 @@ export function Onboarding({
             placeholder="Looking for a hitting partner on Sundays."
           />
         </Field>
+        <CertEditor items={certs} onChange={setCerts} />
+        <HonorEditor items={honors} onChange={setHonors} />
 
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">How people see you</p>
           <div className="mt-3">
             <PlayerSportCards player={preview} />
+            <ProofDisplay certs={certs} honors={honors} />
           </div>
         </div>
 

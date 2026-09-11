@@ -31,8 +31,8 @@ function PrivacyPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>Account details you provide (name, email, password if you use email sign-in).</li>
           <li>
-            Profile answers you choose to share (sports, skill, years, frequency, experience,
-            accomplishments, city, whether you coach).
+            Profile answers you choose to share (photo, sports, skill, years, certifications,
+            titles, trophies, competitions, city, whether you coach).
           </li>
           <li>
             Court listings, reservations, open play RSVPs, partner requests, lessons, leagues,

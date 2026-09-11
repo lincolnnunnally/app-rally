@@ -15,7 +15,7 @@ import type {
   ReservationRow,
   ReviewRow,
 } from "@/lib/rally";
-import { RALLY, citySlug, money, slugify, takeCents } from "@/lib/rally";
+import { RALLY, citySlug, money, parseCerts, parseHonors, slugify, takeCents } from "@/lib/rally";
 
 export type { ReviewRow };
 
@@ -640,7 +640,8 @@ function mapProof(r: Record<string, unknown>, sessions?: number): PlayerProof {
 		tennis_results: r.tennis_results == null ? null : String(r.tennis_results),
 		pickleball_results: r.pickleball_results == null ? null : String(r.pickleball_results),
 		coach_note: r.coach_note == null ? null : String(r.coach_note),
-		sessions
+		sessions,
+		photo_data: r.photo_data == null ? null : String(r.photo_data)
 	};
 }
 function billingOf(createdAt: unknown, stored: string, takeThisMonth: number): CoachBilling {
@@ -748,7 +749,10 @@ function mapProfile(r: Record<string, unknown>): Profile {
 		coach_note: r.coach_note == null ? null : String(r.coach_note),
 		share_code: r.share_code == null ? null : String(r.share_code),
 		referred_by: r.referred_by == null ? null : String(r.referred_by),
-		credit_cents: num(r.credit_cents ?? 0)
+		credit_cents: num(r.credit_cents ?? 0),
+		photo_data: r.photo_data == null ? null : String(r.photo_data),
+		certs: parseCerts(r.certs_json),
+		honors: parseHonors(r.honors_json)
 	};
 }
 function publicOf(p: Profile): PublicProfile {
@@ -856,7 +860,19 @@ var profileInput = z.object({
 	credit_coach_user_id: z.string().max(80).optional(),
 	coach_note: z.string().max(240).optional(),
 	referred_by: z.string().max(32).optional(),
-	coach_code: z.string().max(32).optional()
+	coach_code: z.string().max(32).optional(),
+	photo_data: z.string().max(450000).optional(),
+	certs: z.array(z.object({
+		title: z.string().trim().max(80),
+		issuer: z.string().trim().max(80).optional(),
+		year: z.string().trim().max(12).optional()
+	})).max(20).optional(),
+	honors: z.array(z.object({
+		title: z.string().trim().max(120),
+		event: z.string().trim().max(120).optional(),
+		year: z.string().trim().max(12).optional(),
+		kind: z.enum(["title", "trophy", "competition"])
+	})).max(30).optional()
 });
 export const saveProfile = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(profileInput).handler(async ({ context, data }) => {
 	const sql = await getSql();
@@ -874,6 +890,10 @@ export const saveProfile = createServerFn({ method: "POST" }).middleware([authMi
 		data.plays_pickleball ? data.pickleball_results : null
 	].filter(Boolean);
 	if (results.length) data.accomplishments = results.join("\n");
+	const photo = data.photo_data === undefined ? undefined : data.photo_data || null;
+	if (photo && !photo.startsWith("data:image/")) throw new Error("Photo must be an image you upload.");
+	const certsJson = JSON.stringify(parseCerts(JSON.stringify(data.certs ?? [])));
+	const honorsJson = JSON.stringify(parseHonors(JSON.stringify(data.honors ?? [])));
 	await sql`
       insert into profiles (
         user_id, display_name, city, bio, plays_tennis, plays_pickleball,
@@ -882,7 +902,8 @@ export const saveProfile = createServerFn({ method: "POST" }).middleware([authMi
         years_playing, dupr, utr, experience, accomplishments,
         tennis_years, pickleball_years, tennis_times, pickleball_times,
         tennis_frequency, pickleball_frequency, tennis_experience, pickleball_experience,
-        tennis_results, pickleball_results, credit_coach_user_id, coach_note
+        tennis_results, pickleball_results, credit_coach_user_id, coach_note,
+        photo_data, certs_json, honors_json
       ) values (
         ${context.userId}, ${data.display_name}, ${data.city}, ${data.bio ?? null},
         ${data.plays_tennis}, ${data.plays_pickleball}, ${data.tennis_level ?? null},
@@ -901,7 +922,8 @@ export const saveProfile = createServerFn({ method: "POST" }).middleware([authMi
         ${data.plays_pickleball ? data.pickleball_experience ?? null : null},
         ${data.plays_tennis ? data.tennis_results ?? null : null},
         ${data.plays_pickleball ? data.pickleball_results ?? null : null},
-        ${data.credit_coach_user_id || null}, ${data.coach_note ?? null}
+        ${data.credit_coach_user_id || null}, ${data.coach_note ?? null},
+        ${photo ?? null}, ${certsJson}, ${honorsJson}
       )
       on conflict (user_id) do update set
         display_name = excluded.display_name,
@@ -935,8 +957,12 @@ export const saveProfile = createServerFn({ method: "POST" }).middleware([authMi
         pickleball_results = excluded.pickleball_results,
         credit_coach_user_id = excluded.credit_coach_user_id,
         coach_note = excluded.coach_note,
+        photo_data = coalesce(excluded.photo_data, profiles.photo_data),
+        certs_json = excluded.certs_json,
+        honors_json = excluded.honors_json,
         updated_at = now()
     `;
+	if (data.photo_data === "") await sql`update profiles set photo_data = null where user_id = ${context.userId}`;
 	if (!data.is_coach) await sql`delete from coach_profiles where user_id = ${context.userId}`;
 	else await sql`
         insert into coach_profiles (user_id) values (${context.userId})
@@ -1211,6 +1237,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	await ensureSeed(sql);
 	const rows = await sql`
       select p.user_id, p.display_name, p.city, p.bio, p.plays_tennis, p.plays_pickleball,
+             p.photo_data, p.certs_json, p.honors_json,
              c.headline, c.philosophy, c.hourly_rate, c.certifications,
              c.offers_private, c.offers_group, c.accepting, c.years_coaching,
              c.playing_level, c.specializations, c.achievements, c.travel_radius_mi,
@@ -1231,6 +1258,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	const proofs = await sql`
       select user_id, display_name, plays_tennis, plays_pickleball, pickleball_level, tennis_level,
              years_playing, dupr, utr, experience, accomplishments, coach_note, credit_coach_user_id,
+             photo_data,
              tennis_years, pickleball_years, tennis_times, pickleball_times, tennis_frequency,
              pickleball_frequency, tennis_experience, pickleball_experience, tennis_results, pickleball_results
       from profiles
@@ -1272,7 +1300,14 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 			teaching_juniors: bool(r.teaching_juniors),
 			services: svc,
 			from_cents: from,
-			students: byCredit.get(String(r.user_id)) ?? []
+			students: byCredit.get(String(r.user_id)) ?? [],
+			photo_data: r.photo_data == null ? null : String(r.photo_data),
+			certs: parseCerts(r.certs_json).length
+				? parseCerts(r.certs_json)
+				: parseCerts(r.certifications ? JSON.stringify([{ title: String(r.certifications) }]) : "[]"),
+			honors: parseHonors(r.honors_json).length
+				? parseHonors(r.honors_json)
+				: parseHonors(r.achievements ? JSON.stringify([{ title: String(r.achievements), kind: "title" }]) : "[]")
 		};
 	});
 });

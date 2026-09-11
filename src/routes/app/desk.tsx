@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
-import type { CoachBilling, CoachService, Court, Profile } from "@/lib/rally";
+import type { CertItem, CoachBilling, CoachService, Court, HonorItem, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,8 @@ import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
+import { PhotoPicker } from "@/components/profile-face";
+import { CertEditor, HonorEditor } from "@/components/proof-lists";
 import { CoachInvite, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
@@ -756,11 +758,20 @@ function ListingForm({
   const [headline, setHeadline] = useState(existing?.headline ?? "");
   const [philosophy, setPhilosophy] = useState(existing?.philosophy ?? "");
   const [rate, setRate] = useState(existing?.hourly_rate?.toString() ?? "");
-  const [certs, setCerts] = useState(existing?.certifications ?? "");
+  const [photo, setPhoto] = useState<string | null>(profile.photo_data);
+  const [certItems, setCertItems] = useState<CertItem[]>(
+    profile.certs.length ? profile.certs : existing?.certifications ? [{ title: existing.certifications, issuer: "", year: "" }] : [],
+  );
+  const [honorItems, setHonorItems] = useState<HonorItem[]>(
+    profile.honors.length
+      ? profile.honors
+      : existing?.achievements
+        ? [{ title: existing.achievements, event: "", year: "", kind: "title" }]
+        : [],
+  );
   const [years, setYears] = useState(existing?.years_coaching?.toString() ?? "");
   const [level, setLevel] = useState(existing?.playing_level ?? "");
   const [specs, setSpecs] = useState(existing?.specializations ?? "");
-  const [achievements, setAchievements] = useState(existing?.achievements ?? "");
   const [travel, setTravel] = useState(existing?.travel_radius_mi?.toString() ?? "20");
   const [priv, setPriv] = useState(existing?.offers_private ?? true);
   const [group, setGroup] = useState(existing?.offers_group ?? true);
@@ -772,55 +783,56 @@ function ListingForm({
 
   const save = useMutation({
     mutationFn: async () => {
-      if (!profile.is_coach) {
-        await saveProfile({
-          data: {
-            display_name: profile.display_name,
-            city: profile.city,
-            bio: profile.bio ?? undefined,
-            plays_tennis: profile.plays_tennis,
-            plays_pickleball: profile.plays_pickleball,
-            tennis_level: profile.tennis_level ?? undefined,
-            pickleball_level: profile.pickleball_level ?? undefined,
-            looking_for_partners: profile.looking_for_partners,
-            looking_for_coach: profile.looking_for_coach,
-            interested_in_leagues: profile.interested_in_leagues,
-            is_coach: true,
-            availability: profile.availability ?? undefined,
-            phone: profile.phone ?? undefined,
-            years_playing: profile.years_playing ?? undefined,
-            dupr: profile.dupr ?? undefined,
-            utr: profile.utr ?? undefined,
-            experience: profile.experience ?? undefined,
-            accomplishments: profile.accomplishments ?? undefined,
-            tennis_years: profile.tennis_years ?? undefined,
-            pickleball_years: profile.pickleball_years ?? undefined,
-            tennis_times: profile.tennis_times ?? undefined,
-            pickleball_times: profile.pickleball_times ?? undefined,
-            tennis_frequency: profile.tennis_frequency ?? undefined,
-            pickleball_frequency: profile.pickleball_frequency ?? undefined,
-            tennis_experience: profile.tennis_experience ?? undefined,
-            pickleball_experience: profile.pickleball_experience ?? undefined,
-            tennis_results: profile.tennis_results ?? undefined,
-            pickleball_results: profile.pickleball_results ?? undefined,
-            credit_coach_user_id: profile.credit_coach_user_id ?? undefined,
-            coach_note: profile.coach_note ?? undefined,
-          },
-        });
-      }
+      await saveProfile({
+        data: {
+          display_name: profile.display_name,
+          city: profile.city,
+          bio: profile.bio ?? undefined,
+          plays_tennis: profile.plays_tennis,
+          plays_pickleball: profile.plays_pickleball,
+          tennis_level: profile.tennis_level ?? undefined,
+          pickleball_level: profile.pickleball_level ?? undefined,
+          looking_for_partners: profile.looking_for_partners,
+          looking_for_coach: profile.looking_for_coach,
+          interested_in_leagues: profile.interested_in_leagues,
+          is_coach: true,
+          availability: profile.availability ?? undefined,
+          phone: profile.phone ?? undefined,
+          years_playing: profile.years_playing ?? undefined,
+          dupr: profile.dupr ?? undefined,
+          utr: profile.utr ?? undefined,
+          experience: profile.experience ?? undefined,
+          accomplishments: profile.accomplishments ?? undefined,
+          tennis_years: profile.tennis_years ?? undefined,
+          pickleball_years: profile.pickleball_years ?? undefined,
+          tennis_times: profile.tennis_times ?? undefined,
+          pickleball_times: profile.pickleball_times ?? undefined,
+          tennis_frequency: profile.tennis_frequency ?? undefined,
+          pickleball_frequency: profile.pickleball_frequency ?? undefined,
+          tennis_experience: profile.tennis_experience ?? undefined,
+          pickleball_experience: profile.pickleball_experience ?? undefined,
+          tennis_results: profile.tennis_results ?? undefined,
+          pickleball_results: profile.pickleball_results ?? undefined,
+          credit_coach_user_id: profile.credit_coach_user_id ?? undefined,
+          coach_note: profile.coach_note ?? undefined,
+          photo_data: photo ?? "",
+          certs: certItems,
+          honors: honorItems,
+        },
+      });
       await saveCoachProfile({
         data: {
           headline: headline || undefined,
           philosophy: philosophy || undefined,
           hourly_rate: rate ? Number(rate) : undefined,
-          certifications: certs || undefined,
+          certifications: certItems.map((c) => c.title).filter(Boolean).join(", ") || undefined,
           offers_private: priv,
           offers_group: group,
           accepting,
           years_coaching: years ? Number(years) : undefined,
           playing_level: level || undefined,
           specializations: specs || undefined,
-          achievements: achievements || undefined,
+          achievements: honorItems.map((h) => h.title).filter(Boolean).join("; ") || undefined,
           travel_radius_mi: travel ? Number(travel) : undefined,
           teaching_beginner: beginner,
           teaching_intermediate: intermediate,
@@ -852,6 +864,7 @@ function ListingForm({
           save.mutate();
         }}
       >
+        <PhotoPicker name={profile.display_name} photo={photo} onChange={setPhoto} />
         <Field label="Headline">
           <Input
             value={headline}
@@ -873,13 +886,8 @@ function ListingForm({
             placeholder="Beginner serve, kitchen, juniors, 4.0 plateau"
           />
         </Field>
-        <Field label="Achievements / proof">
-          <Textarea
-            value={achievements}
-            onChange={(e) => setAchievements(e.target.value)}
-            placeholder="Years on these courts. High school clinics. Ladder regular."
-          />
-        </Field>
+        <CertEditor items={certItems} onChange={setCertItems} />
+        <HonorEditor items={honorItems} onChange={setHonorItems} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="From price ($/hr, optional)">
             <Input value={rate} onChange={(e) => setRate(e.target.value)} type="number" min={0} />
@@ -903,13 +911,7 @@ function ListingForm({
             <Input value={travel} onChange={(e) => setTravel(e.target.value)} type="number" min={0} max={200} />
           </Field>
         </div>
-        <Field label="Certifications">
-          <Input
-            value={certs}
-            onChange={(e) => setCerts(e.target.value)}
-            placeholder="PPR, USPTA, PTR — or years on these courts"
-          />
-        </Field>
+
         <div className="grid gap-2 sm:grid-cols-2">
           <Check label="Private lessons" checked={priv} onChange={setPriv} />
           <Check label="Group clinics" checked={group} onChange={setGroup} />

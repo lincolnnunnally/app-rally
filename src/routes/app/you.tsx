@@ -2,6 +2,8 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Brain, GraduationCap, TrendingDown, Trophy, UserRound, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PlayerSportCards } from "@/components/player-proof";
+import { ProfileFace } from "@/components/profile-face";
+import { ProofDisplay } from "@/components/proof-lists";
 import { CoachInvite, ShareRally } from "@/components/share-rally";
 import { UserButton } from "@/lib/auth/gates";
 import { useRally } from "@/lib/rally-context";
@@ -15,9 +17,12 @@ function You() {
     <div className="px-5 py-8">
       <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">You</p>
       <div className="mt-2 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl">{profile.display_name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{profile.city}</p>
+        <div className="flex items-center gap-4">
+          <ProfileFace name={profile.display_name} photo={profile.photo_data} size="lg" />
+          <div>
+            <h1 className="font-display text-4xl">{profile.display_name}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{profile.city}</p>
+          </div>
         </div>
         <UserButton />
       </div>
@@ -25,6 +30,7 @@ function You() {
         <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">Your card</p>
         <div className="mt-3">
           <PlayerSportCards player={profile} />
+          <ProofDisplay certs={profile.certs} honors={profile.honors} />
         </div>
       </Card>
       {profile.is_coach ? (

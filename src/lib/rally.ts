@@ -142,7 +142,72 @@ export type Profile = {
   share_code: string | null;
   referred_by: string | null;
   credit_cents: number;
+  photo_data: string | null;
+  certs: CertItem[];
+  honors: HonorItem[];
 };
+
+export type CertItem = {
+  title: string;
+  issuer: string;
+  year: string;
+};
+
+export type HonorItem = {
+  title: string;
+  event: string;
+  year: string;
+  kind: "title" | "trophy" | "competition";
+};
+
+export const HONOR_KINDS = [
+  { value: "title", label: "Title" },
+  { value: "trophy", label: "Trophy" },
+  { value: "competition", label: "Competition" },
+] as const;
+
+export function parseCerts(raw: unknown): CertItem[] {
+  const rows = parseJsonRows(raw);
+  return rows
+    .map((r) => ({
+      title: String(r.title ?? "").trim(),
+      issuer: String(r.issuer ?? "").trim(),
+      year: String(r.year ?? "").trim(),
+    }))
+    .filter((r) => r.title);
+}
+
+function honorKind(raw: unknown): HonorItem["kind"] {
+  if (raw === "trophy" || raw === "competition" || raw === "title") return raw;
+  return "title";
+}
+
+export function parseHonors(raw: unknown): HonorItem[] {
+  const rows = parseJsonRows(raw);
+  return rows
+    .map((r) => ({
+      title: String(r.title ?? "").trim(),
+      event: String(r.event ?? "").trim(),
+      year: String(r.year ?? "").trim(),
+      kind: honorKind(r.kind),
+    }))
+    .filter((r) => r.title);
+}
+
+function parseJsonRows(raw: unknown): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function honorKindLabel(kind: HonorItem["kind"]) {
+  return HONOR_KINDS.find((k) => k.value === kind)?.label ?? "Title";
+}
 
 export type PublicProfile = Omit<Profile, "phone" | "credit_cents" | "referred_by" | "share_code">;
 
@@ -180,6 +245,7 @@ export type PlayerProof = SportBits & {
   accomplishments: string | null;
   coach_note: string | null;
   sessions?: number;
+  photo_data?: string | null;
 };
 
 export type Court = {
@@ -306,6 +372,9 @@ export type CoachCard = {
   services: CoachService[];
   from_cents: number | null;
   students: PlayerProof[];
+  photo_data: string | null;
+  certs: CertItem[];
+  honors: HonorItem[];
 };
 
 export type LessonRow = {

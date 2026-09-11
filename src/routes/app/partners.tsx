@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerSportCards } from "@/components/player-proof";
+import { ProfileFace } from "@/components/profile-face";
+import { ProofDisplay } from "@/components/proof-lists";
 import { formatWall, nearLevel, sportLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
 import {
@@ -136,6 +138,7 @@ function Partners() {
           <Card key={p.user_id} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
+                <ProfileFace name={p.display_name} photo={p.photo_data} size="sm" />
                 <h2 className="font-display text-xl">{p.display_name}</h2>
                 {p.plays_pickleball ? (
                   <Badge variant="pickleball">PB {p.dupr ?? p.pickleball_level}</Badge>
@@ -150,6 +153,7 @@ function Partners() {
               </p>
               <div className="mt-3">
                 <PlayerSportCards player={p} compact />
+                <ProofDisplay certs={p.certs} honors={p.honors} />
               </div>
               {p.credit_coach_name ? (
                 <p className="mt-2 text-xs text-muted-foreground">

@@ -13,3 +13,5 @@ dist/
 
 .tanstack/
 .project_id
+.vercel
+.env*

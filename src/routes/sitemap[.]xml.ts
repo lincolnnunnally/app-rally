@@ -9,7 +9,14 @@ export const Route = createFileRoute("/sitemap.xml")({
         const proto = host.includes("127.") || host.startsWith("localhost") ? "http" : "https";
         const origin = host ? `${proto}://${host}` : "";
         const cities = await catalogCities();
-        const urls = [`${origin}/`, `${origin}/where`, `${origin}/join`, `${origin}/list-a-court`];
+        const urls = [
+          `${origin}/`,
+          `${origin}/where`,
+          `${origin}/join`,
+          `${origin}/list-a-court`,
+          `${origin}/privacy`,
+          `${origin}/terms`,
+        ];
         for (const city of cities) {
           urls.push(`${origin}/where/${city.slug}`);
           const detail = await catalogCity({ data: { city: city.slug } });

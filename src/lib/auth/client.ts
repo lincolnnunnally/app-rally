@@ -37,6 +37,9 @@ export const authClient = createAuthClient({
  */
 export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
 
+/** Google/X via the Grok broker. Off until this app has its own GROK_AUTH client. */
+export const socialAuthEnabled = import.meta.env.VITE_SOCIAL_AUTH === "true";
+
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };
 

@@ -11,10 +11,9 @@ const databaseUrl =
   rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
 
 /**
- * Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
- * sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM) so
- * the app has a working database even with nothing configured — the live preview
- * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
+ * Active backend: real **Postgres** when `DATABASE_URL` is set (production:
+ * dedicated `rally` database, search_path `rally`). Without DATABASE_URL, local
+ * embedded **PGLite** so sandbox previews still work.
  */
 export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
 
@@ -85,15 +84,36 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
+function connectionStringForPg(url: string): string {
+  // Modern `pg` treats sslmode=require as verify-full and ignores `ssl: {
+  // rejectUnauthorized: false }`. Strip sslmode so the ssl object is honored
+  // for LPL Supabase's pooler chain.
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("ssl");
+    return u.toString();
+  } catch {
+    return url.replace(/[?&]sslmode=[^&]*/gi, "");
+  }
+}
+
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
-    // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
-    // pooled endpoint. One pool per process; warm serverless instances reuse it.
+    // Regular Postgres driver (node-postgres). Production: LPL Supabase pooler.
+    // One pool per process; warm serverless instances reuse it.
     const { Pool, types } = await import("pg");
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({
+      connectionString: connectionStringForPg(databaseUrl!),
+      ssl: { rejectUnauthorized: false },
+      max: 4,
+    });
+    pool.on("connect", (client) => {
+      void client.query("set search_path to rally, public");
+    });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

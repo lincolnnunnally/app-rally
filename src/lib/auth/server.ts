@@ -78,8 +78,12 @@ const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 // otherwise fall back to the shared live-preview client, which the broker accepts
 // for any `*.grok-sandbox.com` callback (see `./preview`).
 const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
-const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
-const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
+const grokClientIdExplicit = env("GROK_AUTH_CLIENT_ID");
+const grokClientSecretExplicit = env("GROK_AUTH_CLIENT_SECRET");
+const grokClientId = grokClientIdExplicit ?? PREVIEW_CLIENT_ID;
+const grokClientSecret = grokClientSecretExplicit ?? PREVIEW_CLIENT_SECRET;
+/** Google/X via the Grok broker — only when this app has its own client, not the preview fallback. */
+const grokOAuthLive = Boolean(grokClientIdExplicit && grokClientSecretExplicit);
 
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =
@@ -106,7 +110,15 @@ const LOCAL_DEV_ORIGINS: string[] = [
 const baseURL = explicitBaseURL ?? {
   // Include loopback hosts so dynamic baseURL resolves for local email/password
   // (not only the preview wildcard).
-  allowedHosts: [...previewAllowedHosts, "localhost", "127.0.0.1", "[::1]"],
+  allowedHosts: [
+    ...previewAllowedHosts,
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+    "rally.unitedundergod.org",
+    "app-rally-nine.vercel.app",
+    "app-rally-life-produces-life.vercel.app",
+  ],
   // `auto` → trust both http:// and https:// expansions of allowedHosts
   // (preview is https; local dev is http).
   protocol: "auto" as const,
@@ -115,13 +127,20 @@ const baseURL = explicitBaseURL ?? {
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
+const productionOrigins = [
+  "https://rally.unitedundergod.org",
+  "https://app-rally-nine.vercel.app",
+  "https://app-rally-life-produces-life.vercel.app",
+  "https://app-rally-git-main-life-produces-life.vercel.app",
+];
 const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
+  ? [explicitBaseURL, ...productionOrigins, ...LOCAL_DEV_ORIGINS]
   : [
       // Host wildcards (matched against Origin's host)
       ...previewAllowedHosts,
       // Full-origin wildcards (matched against Origin)
       ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
+      ...productionOrigins,
       ...LOCAL_DEV_ORIGINS,
     ];
 
@@ -142,7 +161,25 @@ const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 // schema from `migrations/auth/0001_auth.sql`, copied into `migrations/` when
 // the app turns sign-in on.
 const database = databaseUrl
-  ? new Pool({ connectionString: databaseUrl })
+  ? (() => {
+      let connectionString = databaseUrl;
+      try {
+        const u = new URL(databaseUrl);
+        u.searchParams.delete("sslmode");
+        u.searchParams.delete("ssl");
+        connectionString = u.toString();
+      } catch {
+        connectionString = databaseUrl.replace(/[?&]sslmode=[^&]*/gi, "");
+      }
+      const pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+      });
+      pool.on("connect", (client) => {
+        void client.query("set search_path to rally, public");
+      });
+      return pool;
+    })()
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 /** Session token cookie name — also read by the live-preview popup completion page. */
@@ -150,7 +187,7 @@ export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
 
 // Built separately so the `betterAuth({...})` call stays easy to edit without
 // breaking brackets (models often trip on the conditional plugin spread).
-const grokOAuthPlugin = authConfigured
+const grokOAuthPlugin = grokOAuthLive
   ? genericOAuth({
       config: GROK_PROVIDERS.map(({ providerId, idp }) => ({
         providerId,
@@ -211,7 +248,28 @@ export const auth = betterAuth({
   session: { cookieCache: { enabled: true, maxAge: 300 } },
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
-  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),
+  ...(emailAndPasswordEnabled
+    ? {
+        emailAndPassword: {
+          enabled: true,
+          resetPasswordTokenExpiresIn: 60 * 60,
+          sendResetPassword: async ({
+            user,
+            url,
+          }: {
+            user: { email: string; name?: string | null };
+            url: string;
+          }) => {
+            const { sendRallyResetMail } = await import("./reset-mail");
+            await sendRallyResetMail({
+              email: user.email,
+              name: user.name ?? undefined,
+              url,
+            });
+          },
+        },
+      }
+    : {}),
 
   // `__Host-` prefixed cookies: the browser REFUSES any same-named cookie that
   // carries a `Domain` attribute, so a sibling `*.grok.me` app cannot "toss" a

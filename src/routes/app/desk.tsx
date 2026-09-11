@@ -549,10 +549,10 @@ function BillingCard({
             : `${RALLY.lessonPct}% of completed lessons`}
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        {RALLY.trialDays} days free after you list. Then {RALLY.lessonPct}% of each completed
-        lesson, or {money(RALLY.monthlyCents)} a month if you would rather not run a percent.
-        Rally also takes {RALLY.courtPct}% of a court fee and {RALLY.facilityPct}% of a
-        facility cut — only when those fees exist. Rec at $0 stays $0.
+        Rally records the intended split: {RALLY.trialDays} days after you list, then{" "}
+        {RALLY.lessonPct}% of each completed lesson, or {money(RALLY.monthlyCents)} a month.
+        Rec at $0 stays $0. Card checkout is not on yet — Rally does not take payment in the
+        app until that path is proven.
       </p>
       {billing.take_this_month > 0 ? (
         <p className="mt-2 text-sm">Rally this month: {money(billing.take_this_month)}</p>

@@ -38,6 +38,14 @@ export function PublicChrome({ children }: { children: ReactNode }) {
       {children}
       <footer className="border-t border-border px-5 py-8 text-center text-xs text-muted-foreground">
         Rally — tennis and pickleball. Eastern time.
+        {" · "}
+        <Link to="/privacy" className="hover:text-foreground">
+          Privacy
+        </Link>
+        {" · "}
+        <Link to="/terms" className="hover:text-foreground">
+          Terms
+        </Link>
       </footer>
     </div>
   );

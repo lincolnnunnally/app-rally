@@ -193,8 +193,8 @@ function Home() {
           <h2 className="font-display text-3xl">If you coach</h2>
           <p className="mt-3 max-w-xl text-muted-foreground">
             A menu, not one hourly rate. Players who credit you put results on your card. Recurring
-            lessons, the books, a 30-day trial then 8% of completed lessons or $15 a month. Rally
-            only takes when money already moves.
+            lessons and the books live on your desk. Rally records the split when a fee exists.
+            Card checkout is not on yet.
           </p>
           <Button asChild className="mt-6">
             <Link to="/login" search={{ ref: undefined, mode: "up" }}>
@@ -206,6 +206,14 @@ function Home() {
 
       <footer className="border-t border-border px-5 py-8 text-center text-xs text-muted-foreground">
         Rally — tennis and pickleball. Eastern time on the board.
+        {" · "}
+        <Link to="/privacy" className="hover:text-foreground">
+          Privacy
+        </Link>
+        {" · "}
+        <Link to="/terms" className="hover:text-foreground">
+          Terms
+        </Link>
       </footer>
     </main>
   );

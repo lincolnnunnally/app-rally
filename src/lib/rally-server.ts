@@ -13,8 +13,11 @@ import type {
   Profile,
   PublicProfile,
   ReservationRow,
+  ReviewRow,
 } from "@/lib/rally";
 import { RALLY, citySlug, money, slugify, takeCents } from "@/lib/rally";
+
+export type { ReviewRow };
 
 function num(v: unknown) {
 	return typeof v === "number" ? v : Number(v);
@@ -82,44 +85,8 @@ async function runSeed(sql: Sql) {
         true
       )
     `;
-		await sql`
-      insert into leagues (owner_user_id, name, sport, format, skill_band, season_label, status, notes)
-      values
-      (
-        null,
-        'Vidalia Thursday Night',
-        'pickleball',
-        'ladder',
-        '3.0–4.0',
-        'Fall',
-        'open',
-        'Ladder night after the 5:30 open play. Challenge up two rungs. Bring a paddle, stay for a second match if the courts are open.'
-      ),
-      (
-        null,
-        'Sweet Onion Round Robin',
-        'pickleball',
-        'round_robin',
-        '2.5–3.5',
-        'Fall',
-        'open',
-        'Rotating partners. Built for the rec crowd that wants matches with a score, not a shout.'
-      ),
-      (
-        null,
-        'Stockyard Singles',
-        'tennis',
-        'round_robin',
-        '3.0–4.5',
-        'Fall',
-        'open',
-        'Best of three sets, or a timed 90-minute pro set if the lights are going to cut you off.'
-      )
-    `;
 	}
-	await ensureCommunity(sql);
 	await ensureFacilities(sql);
-	await ensurePlayerResumes(sql);
 	await ensureCourtSlugs(sql);
 	await ensureUpcomingSessions(sql);
 }
@@ -146,19 +113,19 @@ async function ensureUpcomingSessions(sql: Sql) {
 		title: "Monday Open Play",
 		date,
 		time: "17:30:00",
-		notes: "The usual Rec crowd. Mix of rec and competitive. Balls on court."
+		notes: "Posted Rec hours. RSVP so the board knows who is coming."
 	});
 	for (const date of upcomingDow(4, 3)) rows.push({
 		title: "Thursday Open Play",
 		date,
 		time: "17:30:00",
-		notes: "Busy night. Ladder folks often stay after. Call in if you need a partner."
+		notes: "Posted Rec hours. RSVP if you are coming."
 	});
 	for (const date of upcomingDow(0, 3)) rows.push({
 		title: "Sunday Open Play",
 		date,
 		time: "14:00:00",
-		notes: "Afternoon session. Beginners welcome. Shade is limited — bring water."
+		notes: "Posted Rec hours. Beginners welcome. Shade is limited — bring water."
 	});
 	for (const row of rows) {
 		const starts = `${row.date} ${row.time}`;
@@ -986,7 +953,9 @@ export const listPartners = createServerFn({ method: "GET" }).middleware([authMi
       select p.*, c.display_name as credit_coach_name
       from profiles p
       left join profiles c on c.user_id = p.credit_coach_user_id
-      where p.onboarded = true and p.looking_for_partners = true and p.user_id <> ${context.userId}
+      where p.onboarded = true and p.looking_for_partners = true
+        and p.user_id <> ${context.userId}
+        and p.user_id not like 'seed:%'
       order by p.display_name
     `).map((r) => publicOf(mapProfile(r)));
 });
@@ -995,7 +964,7 @@ export const listDirectory = createServerFn({ method: "GET" }).middleware([authM
 	await ensureSeed(sql);
 	return (await sql`
       select * from profiles
-      where onboarded = true and user_id <> ${context.userId}
+      where onboarded = true and user_id <> ${context.userId} and user_id not like 'seed:%'
       order by display_name
     `).map((r) => publicOf(mapProfile(r)));
 });
@@ -1197,7 +1166,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
              c.teaching_beginner, c.teaching_intermediate, c.teaching_advanced, c.teaching_juniors
       from coach_profiles c
       join profiles p on p.user_id = c.user_id
-      where p.onboarded = true and p.is_coach = true
+      where p.onboarded = true and p.is_coach = true and p.user_id not like 'seed:%'
       order by c.accepting desc, p.display_name
     `;
 	const services = await sql`select * from coach_services order by price_cents`;
@@ -2298,7 +2267,7 @@ export const catalogCity = createServerFn({ method: "GET" }).validator(z.object(
       select p.user_id, p.display_name, p.city, p.plays_tennis, p.plays_pickleball, c.headline, c.hourly_rate
       from coach_profiles c
       join profiles p on p.user_id = c.user_id
-      where p.onboarded = true and p.is_coach = true and lower(p.city) = lower(${city})
+      where p.onboarded = true and p.is_coach = true and p.user_id not like 'seed:%' and lower(p.city) = lower(${city})
       order by p.display_name
     `;
 	const services = await sql`
@@ -2343,5 +2312,57 @@ export const lookupShare = createServerFn({ method: "GET" }).validator(z.object(
     `;
 	if (!rows[0]) return null;
 	const p = mapProfile(rows[0]);
+	if (p.user_id.startsWith("seed:")) return null;
 	return publicOf(p);
 });
+
+export const listReviews = createServerFn({ method: "GET" })
+	.validator(z.object({
+		subject_type: z.enum(["player", "coach", "facility"]),
+		subject_id: z.string().min(1).max(80),
+	}))
+	.handler(async ({ data }) => {
+		const sql = await getSql();
+		await ensureSeed(sql);
+		return (await sql`
+      select r.id, r.reviewer_user_id, r.subject_type, r.subject_id, r.rating, r.body,
+             r.created_at::text as created_at,
+             coalesce(p.display_name, 'Player') as reviewer_name
+      from reviews r
+      left join profiles p on p.user_id = r.reviewer_user_id
+      where r.subject_type = ${data.subject_type} and r.subject_id = ${data.subject_id}
+      order by r.created_at desc
+      limit 50
+    `).map((r) => ({
+			id: num(r.id),
+			reviewer_user_id: String(r.reviewer_user_id),
+			reviewer_name: String(r.reviewer_name),
+			subject_type: String(r.subject_type) as "player" | "coach" | "facility",
+			subject_id: String(r.subject_id),
+			rating: num(r.rating),
+			body: String(r.body),
+			created_at: String(r.created_at),
+		}));
+	});
+
+export const submitReview = createServerFn({ method: "POST" })
+	.middleware([authMiddleware])
+	.validator(z.object({
+		subject_type: z.enum(["player", "coach", "facility"]),
+		subject_id: z.string().min(1).max(80),
+		rating: z.coerce.number().int().min(1).max(5),
+		body: z.string().trim().min(8).max(600),
+	}))
+	.handler(async ({ context, data }) => {
+		if (data.subject_id === context.userId) {
+			throw new Error("You cannot review yourself.");
+		}
+		const sql = await getSql();
+		await sql`
+      insert into reviews (reviewer_user_id, subject_type, subject_id, rating, body)
+      values (${context.userId}, ${data.subject_type}, ${data.subject_id}, ${data.rating}, ${data.body})
+      on conflict (reviewer_user_id, subject_type, subject_id)
+      do update set rating = excluded.rating, body = excluded.body, created_at = now()
+    `;
+		return { ok: true };
+	});

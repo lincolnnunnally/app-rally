@@ -401,6 +401,17 @@ export type Notice = {
   created_at: string;
 };
 
+export type ReviewRow = {
+  id: number;
+  reviewer_user_id: string;
+  reviewer_name: string;
+  subject_type: "player" | "coach" | "facility";
+  subject_id: string;
+  rating: number;
+  body: string;
+  created_at: string;
+};
+
 export type AdviceHref =
   | "/app/coaches"
   | "/app/play"

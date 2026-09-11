@@ -3,6 +3,7 @@ import { ShareListing } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ReviewBlock } from "@/components/reviews";
 import { catalogCourt } from "@/lib/rally-server";
 import { bookingLabel, citySlug, kindLabel, money, sportLabel } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -130,6 +131,8 @@ function CourtPage() {
       <div className="mt-6">
         <ShareListing href={`/where/${city}/${c.slug}`} label={c.name} />
       </div>
+
+      <ReviewBlock subjectType="facility" subjectId={String(c.id)} noun={c.name} />
 
       <div className="mt-8 flex flex-wrap gap-2">
         <Button asChild>

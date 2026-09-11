@@ -14,6 +14,9 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as ListACourtRouteImport } from './routes/list-a-court'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as WhereRouteImport } from './routes/where'
@@ -59,6 +62,21 @@ const ListACourtRoute = ListACourtRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -173,6 +191,9 @@ export interface FileRoutesByFullPath {
   '/join': typeof JoinRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/where': typeof WhereRouteWithChildren
@@ -200,6 +221,9 @@ export interface FileRoutesByTo {
   '/join': typeof JoinRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app/coaches': typeof AppCoachesRoute
@@ -226,6 +250,9 @@ export interface FileRoutesById {
   '/join': typeof JoinRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/where': typeof WhereRouteWithChildren
@@ -256,6 +283,9 @@ export interface FileRouteTypes {
     | '/join'
     | '/list-a-court'
     | '/login'
+    | '/privacy'
+    | '/reset-password'
+    | '/terms'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/where'
@@ -283,6 +313,9 @@ export interface FileRouteTypes {
     | '/join'
     | '/list-a-court'
     | '/login'
+    | '/privacy'
+    | '/reset-password'
+    | '/terms'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/app/coaches'
@@ -308,6 +341,9 @@ export interface FileRouteTypes {
     | '/join'
     | '/list-a-court'
     | '/login'
+    | '/privacy'
+    | '/reset-password'
+    | '/terms'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/where'
@@ -337,6 +373,9 @@ export interface RootRouteChildren {
   JoinRoute: typeof JoinRoute
   ListACourtRoute: typeof ListACourtRoute
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  TermsRoute: typeof TermsRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   WhereRoute: typeof WhereRouteWithChildren
@@ -378,6 +417,27 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -606,6 +666,9 @@ const rootRouteChildren: RootRouteChildren = {
   JoinRoute: JoinRoute,
   ListACourtRoute: ListACourtRoute,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  TermsRoute: TermsRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   WhereRoute: WhereRouteWithChildren,

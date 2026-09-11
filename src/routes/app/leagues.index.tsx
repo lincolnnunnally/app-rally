@@ -40,6 +40,14 @@ function Leagues() {
         <CreateLeague />
       </div>
       <div className="mt-8 flex flex-col gap-3">
+        {leagues.isSuccess && (leagues.data ?? []).length === 0 ? (
+          <Card>
+            <p className="font-display text-xl">No leagues yet</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Empty stays empty until someone opens a real roster. Start one if you will run it.
+            </p>
+          </Card>
+        ) : null}
         {(leagues.data ?? []).map((l) => (
           <Card key={l.id} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

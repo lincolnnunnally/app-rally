@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
+import { ReviewBlock } from "@/components/reviews";
 import { listCoaches, listMyLessons, requestLesson } from "@/lib/rally-server";
 
 type Fit = "all" | "beginner" | "stalled" | "juniors";
@@ -86,8 +87,14 @@ function Coaches() {
       <div className="mt-8 flex flex-col gap-3">
         {coaches.isSuccess && filtered.length === 0 ? (
           <Card>
-            <p className="font-display text-xl">No coaches in that filter</p>
-            <p className="mt-2 text-sm text-muted-foreground">Try everyone, or open a desk if you teach this.</p>
+            <p className="font-display text-xl">
+              {fit === "all" ? "No coaches listed yet" : "No coaches in that filter"}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {fit === "all"
+                ? "Empty stays empty until a real coach opens a desk. If you teach, open yours."
+                : "Try everyone, or open a desk if you teach this."}
+            </p>
           </Card>
         ) : null}
         {filtered.map((c) => (
@@ -193,6 +200,7 @@ function CoachRow({
               ))}
             </ul>
           ) : null}
+          {!mine ? <ReviewBlock subjectType="coach" subjectId={c.user_id} noun={c.display_name} /> : null}
         </div>
         {!mine && c.accepting ? <BookDialog coach={c} courts={courts} /> : null}
       </div>

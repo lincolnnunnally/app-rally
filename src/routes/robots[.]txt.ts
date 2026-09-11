@@ -12,6 +12,8 @@ Allow: /
 Allow: /where
 Allow: /join
 Allow: /list-a-court
+Allow: /privacy
+Allow: /terms
 Disallow: /app
 Disallow: /api
 Disallow: /login

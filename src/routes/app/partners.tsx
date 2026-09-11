@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PlayerSportCards } from "@/components/player-proof";
 import { formatWall, nearLevel, sportLabel } from "@/lib/rally";
+import { ReviewBlock } from "@/components/reviews";
 import {
   listPartners,
   listPlayRequests,
@@ -156,6 +157,7 @@ function Partners() {
                   {p.coach_note ? ` — “${p.coach_note}”` : ""}
                 </p>
               ) : null}
+              <ReviewBlock subjectType="player" subjectId={p.user_id} noun={p.display_name} />
             </div>
             <AskDialog to={p.user_id} name={p.display_name} courts={courts} />
           </Card>

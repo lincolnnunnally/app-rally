@@ -3,11 +3,9 @@
  * Deploy-time database migrator (node-postgres, `pg`).
  *
  * Runs during `npm run build` — on every Vercel deploy — applying pending files
- * in ../migrations to DATABASE_URL. Each file is applied in one transaction and
- * recorded in a `_migrations` table, so it runs once and is safe to re-run.
- *
- * The read is non-recursive, so the opt-in auth schema under migrations/auth/
- * is not applied to an app that never asked for sign-in.
+ * in ../migrations to DATABASE_URL (production: shared LPL Supabase, rally
+ * schema — not Neon). Each file is applied in one transaction and recorded in
+ * `_migrations`, so it runs once and is safe to re-run.
  *
  * No DATABASE_URL (local / preview builds) -> skip; the PGLite fallback applies
  * the same files at startup instead (see src/lib/db.ts).
@@ -26,6 +24,14 @@ if (!databaseUrl) {
   process.exit(0);
 }
 
+// Managed Postgres (LPL Supabase pooler) often fails Node's strict TLS verify
+// even with pg `ssl: { rejectUnauthorized: false }` when the URI includes
+// sslmode=require (treated as verify-full in newer pg). Disable only for this
+// short migrate process — not for the long-lived app server.
+if (/supabase|pooler/i.test(databaseUrl)) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
 
 async function main() {
@@ -36,19 +42,36 @@ async function main() {
     console.log("[migrate] no migrations/ directory — nothing to do.");
     return;
   }
-  // An app with no schema of its own must not pay for a database connection.
   if (pendingMigrations(entries, []).length === 0) {
     console.log("[migrate] no migrations — nothing to do.");
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+  let connectionString = databaseUrl;
+  try {
+    const u = new URL(databaseUrl);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("ssl");
+    connectionString = u.toString();
+  } catch {
+    connectionString = databaseUrl.replace(/[?&]sslmode=[^&]*/gi, "");
+  }
+
+  const pool = new pg.Pool({
+    connectionString,
+    max: 1,
+    ssl: { rejectUnauthorized: false },
+  });
   const client = await pool.connect();
   try {
+    // Shared LPL: keep Rally isolated in its own schema (Better Auth tables
+    // would otherwise collide with public.user-like names across ecosystem apps).
+    await client.query("CREATE SCHEMA IF NOT EXISTS rally");
+    await client.query("SET search_path TO rally, public");
     await client.query(
-      "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
+      "CREATE TABLE IF NOT EXISTS rally._migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
     );
-    const applied = (await client.query("SELECT name FROM _migrations")).rows.map(
+    const applied = (await client.query("SELECT name FROM rally._migrations")).rows.map(
       (r) => r.name,
     );
 
@@ -57,9 +80,8 @@ async function main() {
       const text = await readFile(join(migrationsDir, name), "utf8");
       try {
         await client.query("BEGIN");
-        // pg's simple-query protocol runs a whole multi-statement file at once.
         await client.query(text);
-        await client.query("INSERT INTO _migrations (name) VALUES ($1)", [name]);
+        await client.query("INSERT INTO rally._migrations (name) VALUES ($1)", [name]);
         await client.query("COMMIT");
       } catch (err) {
         console.error(`[migrate] error applying ${name}`);
@@ -82,7 +104,6 @@ async function main() {
 
 main().catch((err) => {
   console.error("[migrate] failed:", err?.message || err);
-  // pg errors carry the context needed to debug a bad SQL file.
   for (const key of ["code", "detail", "hint", "position", "where"]) {
     if (err?.[key] != null) console.error(`[migrate]   ${key}: ${err[key]}`);
   }

@@ -20,6 +20,7 @@ import {
   SERVICE_KINDS,
   SERVICE_UNITS,
   formatWall,
+  lessonWho,
   money,
   priceLine,
   sportLabel,
@@ -124,7 +125,7 @@ function Desk() {
                   <Card key={l.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm">
-                        {l.player_name} · {l.service_name ?? sportLabel(l.sport)}
+                        {lessonWho(l)} · {l.service_name ?? sportLabel(l.sport)}
                         {l.series_id ? " · series" : ""}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -164,7 +165,7 @@ function Desk() {
                 {upcoming.map((l) => (
                   <li key={l.id} className="flex flex-col gap-2 rounded-lg border border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                     <span>
-                      {l.player_name} · {formatWall(l.starts_at)}
+                      {lessonWho(l)} · {formatWall(l.starts_at)}
                       {l.service_name ? ` · ${l.service_name}` : ""}
                       {l.series_id ? " · recurring" : ""}
                       {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
@@ -271,6 +272,10 @@ function LogLessonForm({
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [forKind, setForKind] = useState<"self" | "child">("self");
+  const tennisCourt = courts.find(
+    (c) => c.status === "open" && !c.is_other && c.sports.includes("tennis"),
+  );
   const save = useMutation({
     mutationFn: (data: Parameters<typeof logLesson>[0]["data"]) => logLesson({ data }),
     onSuccess: () => {
@@ -313,10 +318,12 @@ function LogLessonForm({
             service_id: serviceId,
             recur_weeks: Number(f.get("recur_weeks") || 1),
             group_spots: f.get("group_spots") ? Number(f.get("group_spots")) : undefined,
+            for_kind: forKind,
+            for_name: forKind === "child" ? String(f.get("for_name") || "").trim() : undefined,
           });
         }}
       >
-        <Field label="Student">
+        <Field label="Student (the parent if this is for a kid)">
           <Select name="player_user_id" required>
             <option value="">Select</option>
             {people.map((p) => (
@@ -326,6 +333,21 @@ function LogLessonForm({
             ))}
           </Select>
         </Field>
+        <Field label="Who plays">
+          <Select
+            name="for_kind"
+            value={forKind}
+            onChange={(e) => setForKind(e.target.value === "child" ? "child" : "self")}
+          >
+            <option value="self">The student</option>
+            <option value="child">Their child</option>
+          </Select>
+        </Field>
+        {forKind === "child" ? (
+          <Field label="Child's first name">
+            <Input name="for_name" required placeholder="First name" />
+          </Field>
+        ) : null}
         {services.length > 0 ? (
           <Field label="Service">
             <Select name="service_id" defaultValue={String(services[0]!.id)}>
@@ -359,8 +381,8 @@ function LogLessonForm({
           <Select
             name="court_id"
             defaultValue={String(
-              courts.find((c) => c.status === "open" && !c.is_other && c.name.includes("Rec"))?.id ??
-                courts.find((c) => c.status === "open")?.id ??
+              tennisCourt?.id ??
+                courts.find((c) => c.status === "open" && !c.is_other)?.id ??
                 courts[0]?.id ??
                 "",
             )}
@@ -831,7 +853,7 @@ function ListingForm({
           <Input
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
-            placeholder="3.5–4.5 pickleball. Third shot and kitchen."
+            placeholder="Tennis lessons at Ed Smith. Beginners and juniors."
           />
         </Field>
         <Field label="Philosophy">

@@ -328,7 +328,14 @@ export type LessonRow = {
   facility_cut_cents: number;
   service_name: string | null;
   rally_take_cents: number;
+  for_kind: "self" | "child";
+  for_name: string | null;
 };
+
+export function lessonWho(l: Pick<LessonRow, "player_name" | "for_kind" | "for_name">) {
+  if (l.for_kind === "child" && l.for_name) return `${l.player_name} · for ${l.for_name}`;
+  return l.player_name;
+}
 
 export type PlayRequestRow = {
   id: number;

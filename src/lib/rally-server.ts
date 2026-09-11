@@ -40,7 +40,7 @@ async function runSeed(sql: Sql) {
       insert into courts (name, address, city, sports, indoor, court_count, surface, lights, restrooms, access_notes, typical_hours, phone, is_other)
       values
       (
-        'Vidalia Rec — Pickleball',
+        'Ed Smith Complex — Pickleball',
         '102 Stockyard Rd',
         'Vidalia',
         'pickleball',
@@ -49,23 +49,23 @@ async function runSeed(sql: Sql) {
         'Asphalt, permanent lines and nets',
         true,
         true,
-        'Free public courts. The usual crowd plays Monday and Thursday at 5:30 PM and Sunday at 2:00 PM. Lights and restrooms on site.',
+        'Ed Smith Complex (Smith Park / Vidalia Rec). Free public pickleball courts at Stockyard Road. Lights and restrooms on site.',
         'Open play most evenings; lighted',
         '912-537-7913',
         false
       ),
       (
-        'Vidalia Rec — Tennis',
+        'Ed Smith Complex — Tennis',
         '102 Stockyard Rd',
         'Vidalia',
         'tennis',
         false,
-        2,
+        4,
         'Hard court',
         true,
         true,
-        'Tennis courts at the Rec Complex. Same site as pickleball. Call Parks & Rec to confirm availability for league nights.',
-        'Daylight plus lights',
+        'Ed Smith Complex (Smith Park / Vidalia Rec). Four lighted tennis courts at Stockyard Road. Parks & Rec: 912-537-7913.',
+        'Daylight plus lights until 10 PM',
         '912-537-7913',
         false
       ),
@@ -105,7 +105,9 @@ async function ensureUpcomingSessions(sql: Sql) {
     select count(*)::int as n from sessions where starts_at > now()
   `)[0]?.n ?? 0) >= 6) return;
 	const courtId = (await sql`
-    select id from courts where name = 'Vidalia Rec — Pickleball' limit 1
+    select id from courts
+    where name in ('Ed Smith Complex — Pickleball', 'Vidalia Rec — Pickleball')
+    limit 1
   `)[0]?.id;
 	if (!courtId) return;
 	const rows = [];
@@ -258,23 +260,37 @@ async function ensureCommunity(sql: Sql) {
 async function ensureFacilities(sql: Sql) {
 	await sql`
     update courts set
+      name = 'Ed Smith Complex — Pickleball',
+      address = '102 Stockyard Rd',
       lat = 32.2174, lng = -82.4132, region = 'Toombs', kind = 'public', status = 'open',
+      court_count = 4, lights = true, restrooms = true,
       booking_mode = 'claim', player_fee_cents = 0, coach_fee_cents = 0, facility_cut_pct = 0,
       manager_name = 'Vidalia Parks & Rec', manager_phone = '912-537-7913',
       manager_email = 'parks@vidaliaga.gov', lights_until = '10:00 PM',
-      rules = 'Public courts. Community claims in Rally are a courtesy so two groups are not walking up to the same four nets. Parks & Rec still owns the asphalt.',
-      restrictions = 'No exclusive block during posted open play (Mon/Thu 5:30, Sun 2:00) unless you are hosting that session. Coaches: introduce yourself to Parks & Rec before you run a paid clinic.'
-    where name = 'Vidalia Rec — Pickleball' and (lat is null or manager_name is null)
+      typical_hours = 'Open play most evenings; lighted until 10 PM',
+      access_notes = 'Ed Smith Complex (Smith Park / Vidalia Rec). Free public pickleball courts at Stockyard Road. Lights and restrooms on site.',
+      rules = 'Public courts at Ed Smith Complex. Community claims in Rally are a courtesy so two groups are not walking up to the same nets. Parks & Rec still owns the asphalt.',
+      restrictions = 'No exclusive block during posted open play (Mon/Thu 5:30, Sun 2:00) unless you are hosting that session. Coaches: introduce yourself to Parks & Rec before you run a paid clinic.',
+      slug = coalesce(slug, 'vidalia-rec-pickleball')
+    where name in ('Vidalia Rec — Pickleball', 'Ed Smith Complex — Pickleball')
+       or slug = 'vidalia-rec-pickleball'
   `;
 	await sql`
     update courts set
+      name = 'Ed Smith Complex — Tennis',
+      address = '102 Stockyard Rd',
       lat = 32.2171, lng = -82.414, region = 'Toombs', kind = 'public', status = 'open',
+      court_count = 4, lights = true, restrooms = true,
       booking_mode = 'claim', player_fee_cents = 0, coach_fee_cents = 0, facility_cut_pct = 0,
       manager_name = 'Vidalia Parks & Rec', manager_phone = '912-537-7913',
       manager_email = 'parks@vidaliaga.gov', lights_until = '10:00 PM',
-      rules = 'Same Rec Complex as pickleball. Call Parks & Rec if you need the courts for a league night so they are not double-booked with a rec program.',
-      restrictions = 'Lights cut at 10. No vehicles on the courts. Coaching is welcome; a paid clinic should be on the Parks & Rec calendar.'
-    where name = 'Vidalia Rec — Tennis' and (lat is null or manager_name is null)
+      typical_hours = 'Daylight plus lights until 10 PM',
+      access_notes = 'Ed Smith Complex (Smith Park / Vidalia Rec). Four lighted tennis courts at Stockyard Road. Parks & Rec: 912-537-7913.',
+      rules = 'Same complex as pickleball. Call Parks & Rec if you need the courts for a league night so they are not double-booked with a rec program. Coaching is welcome.',
+      restrictions = 'Lights cut at 10. No vehicles on the courts. A paid clinic should be on the Parks & Rec calendar.',
+      slug = coalesce(slug, 'vidalia-rec-tennis')
+    where name in ('Vidalia Rec — Tennis', 'Ed Smith Complex — Tennis')
+       or slug = 'vidalia-rec-tennis'
   `;
 	await sql`
     update courts set
@@ -1406,6 +1422,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
         select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
+               l.for_kind, l.for_name,
                c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
                sv.name as service_name
         from lessons l
@@ -1420,6 +1437,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
         select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
+               l.for_kind, l.for_name,
                c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
                sv.name as service_name
         from lessons l
@@ -1450,7 +1468,9 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
 		facility_fee_cents: num(r.facility_fee_cents ?? 0),
 		facility_cut_cents: num(r.facility_cut_cents ?? 0),
 		service_name: r.service_name == null ? null : String(r.service_name),
-		rally_take_cents: num(r.rally_take_cents ?? 0)
+		rally_take_cents: num(r.rally_take_cents ?? 0),
+		for_kind: r.for_kind === "child" ? "child" : "self",
+		for_name: r.for_name == null ? null : String(r.for_name)
 	}));
 }
 export const listMyLessons = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
@@ -1464,7 +1484,9 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	court_id: z.coerce.number().optional(),
 	notes: z.string().max(400).optional(),
 	service_id: z.coerce.number().optional(),
-	recur_weeks: z.coerce.number().min(1).max(12).optional()
+	recur_weeks: z.coerce.number().min(1).max(12).optional(),
+	for_kind: z.enum(["self", "child"]).optional(),
+	for_name: z.string().trim().max(80).optional()
 })).handler(async ({ context, data }) => {
 	if (data.coach_user_id === context.userId) throw new Error("You cannot book yourself.");
 	const sql = await getSql();
@@ -1476,24 +1498,30 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	});
 	const weeks = data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
 	const series = weeks > 1 ? crypto.randomUUID() : null;
+	const forKind = data.for_kind === "child" ? "child" : "self";
+	const forName = forKind === "child" ? (data.for_name || "").trim() || null : null;
+	if (forKind === "child" && !forName) throw new Error("Add the child's first name.");
 	for (let i = 0; i < weeks; i += 1) {
 		const when = i === 0 ? starts : addDays(starts, i * 7);
 		await sql`
         insert into lessons (
           coach_user_id, player_user_id, court_id, starts_at, duration_min, sport, status, notes,
-          service_id, price_cents, billing, series_id, facility_fee_cents, facility_cut_cents
+          service_id, price_cents, billing, series_id, facility_fee_cents, facility_cut_cents,
+          for_kind, for_name
         ) values (
           ${data.coach_user_id}, ${context.userId}, ${data.court_id ?? null},
           ${when}::timestamp, ${priced.duration}, ${data.sport}, 'requested', ${data.notes ?? null},
           ${priced.serviceId}, ${priced.price}, ${priced.billing}, ${series},
-          ${priced.facilityFee}, ${priced.facilityCut}
+          ${priced.facilityFee}, ${priced.facilityCut},
+          ${forKind}, ${forName}
         )
       `;
 	}
 	const who = await sql`
       select display_name from profiles where user_id = ${context.userId} limit 1
     `;
-	await notify(sql, data.coach_user_id, "Lesson request", `${who[0]?.display_name ?? "A player"} asked for ${data.sport}${weeks > 1 ? ` · ${weeks} weeks` : ""}.`, "/app/desk");
+	const whoLine = forName ? `${who[0]?.display_name ?? "A parent"} for ${forName}` : (who[0]?.display_name ?? "A player");
+	await notify(sql, data.coach_user_id, "Lesson request", `${whoLine} asked for ${data.sport}${weeks > 1 ? ` · ${weeks} weeks` : ""}.`, "/app/desk");
 	return { ok: true };
 });
 export const logLesson = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -1505,7 +1533,9 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	notes: z.string().max(400).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
-	group_spots: z.coerce.number().min(1).max(16).optional()
+	group_spots: z.coerce.number().min(1).max(16).optional(),
+	for_kind: z.enum(["self", "child"]).optional(),
+	for_name: z.string().trim().max(80).optional()
 })).handler(async ({ context, data }) => {
 	if (data.player_user_id === context.userId) throw new Error("Pick a student.");
 	const sql = await getSql();
@@ -1522,21 +1552,32 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	});
 	const weeks = data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
 	const series = weeks > 1 ? crypto.randomUUID() : null;
+	const forKind = data.for_kind === "child" ? "child" : "self";
+	const forName = forKind === "child" ? (data.for_name || "").trim() || null : null;
+	if (forKind === "child" && !forName) throw new Error("Add the child's first name.");
 	for (let i = 0; i < weeks; i += 1) {
 		const when = i === 0 ? starts : addDays(starts, i * 7);
 		await sql`
         insert into lessons (
           coach_user_id, player_user_id, court_id, starts_at, duration_min, sport, status, notes,
-          service_id, price_cents, billing, group_spots, series_id, facility_fee_cents, facility_cut_cents
+          service_id, price_cents, billing, group_spots, series_id, facility_fee_cents, facility_cut_cents,
+          for_kind, for_name
         ) values (
           ${context.userId}, ${data.player_user_id}, ${data.court_id ?? null},
           ${when}::timestamp, ${priced.duration}, ${data.sport}, 'confirmed', ${data.notes ?? null},
           ${priced.serviceId}, ${priced.price}, ${priced.billing}, ${data.group_spots ?? null}, ${series},
-          ${priced.facilityFee}, ${priced.facilityCut}
+          ${priced.facilityFee}, ${priced.facilityCut},
+          ${forKind}, ${forName}
         )
       `;
 	}
-	await notify(sql, data.player_user_id, weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books", "Your coach put a lesson on the board.", "/app/coaches");
+	await notify(
+		sql,
+		data.player_user_id,
+		weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books",
+		forName ? `Your coach put a lesson for ${forName} on the board.` : "Your coach put a lesson on the board.",
+		"/app/coaches",
+	);
 	return { ok: true };
 });
 export const setLessonStatus = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({

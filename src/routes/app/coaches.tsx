@@ -64,9 +64,9 @@ function Coaches() {
         )}
       </div>
       <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-        Price is a menu, not a single number. Players who credit a coach put
-        their results on the card — that is how the price is proven. Beginner
-        hour, group clinic, hitting — book a series. The coach confirms.
+        Book a lesson for you or your kid. Pick Ed Smith Complex (Smith Park /
+        Vidalia Rec) as the court. The coach confirms. Recurring weeks stay on
+        both calendars.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -111,6 +111,7 @@ function Coaches() {
                 <div className="flex items-center justify-between gap-2">
                   <span>
                     {l.coach_name} · {l.service_name ?? sportLabel(l.sport)}
+                    {l.for_kind === "child" && l.for_name ? ` · for ${l.for_name}` : ""}
                     {l.series_id ? " · recurring" : ""}
                   </span>
                   <Badge>{l.status}</Badge>
@@ -211,6 +212,11 @@ function CoachRow({
 function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [forKind, setForKind] = useState<"self" | "child">("self");
+  const tennisCourt = courts.find(
+    (c) => c.status === "open" && !c.is_other && c.sports.includes("tennis"),
+  );
+  const recCourt = courts.find((c) => c.status === "open" && !c.is_other && c.name.includes("Rec"));
   const book = useMutation({
     mutationFn: (data: Parameters<typeof requestLesson>[0]["data"]) => requestLesson({ data }),
     onSuccess: () => {
@@ -237,6 +243,7 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
             const f = new FormData(e.currentTarget);
             const serviceId = f.get("service_id") ? Number(f.get("service_id")) : undefined;
             const svc = coach.services.find((s) => s.id === serviceId);
+            const child = String(f.get("for_name") || "").trim();
             book.mutate({
               coach_user_id: coach.user_id,
               sport: (svc?.sport as "pickleball" | "tennis") || (String(f.get("sport")) as "pickleball" | "tennis"),
@@ -246,6 +253,8 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
               notes: String(f.get("notes") || "") || undefined,
               service_id: serviceId,
               recur_weeks: Number(f.get("recur_weeks") || 1),
+              for_kind: forKind,
+              for_name: forKind === "child" ? child : undefined,
             });
           }}
         >
@@ -270,6 +279,23 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
             </div>
           )}
           <div className="flex flex-col gap-1.5">
+            <Label>Who is this lesson for?</Label>
+            <Select
+              name="for_kind"
+              value={forKind}
+              onChange={(e) => setForKind(e.target.value === "child" ? "child" : "self")}
+            >
+              <option value="self">Me</option>
+              <option value="child">My child</option>
+            </Select>
+          </div>
+          {forKind === "child" ? (
+            <div className="flex flex-col gap-1.5">
+              <Label>Child's first name</Label>
+              <Input name="for_name" required placeholder="First name" />
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-1.5">
             <Label>When</Label>
             <Input name="starts_at" type="datetime-local" required />
           </div>
@@ -288,7 +314,8 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
             <Select
               name="court_id"
               defaultValue={String(
-                courts.find((c) => c.status === "open" && !c.is_other && c.name.includes("Rec"))?.id ??
+                tennisCourt?.id ??
+                  recCourt?.id ??
                   courts.find((c) => c.status === "open")?.id ??
                   courts[0]?.id ??
                   "",

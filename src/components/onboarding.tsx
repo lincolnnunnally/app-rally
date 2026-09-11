@@ -32,12 +32,12 @@ export function Onboarding({
     existing?.display_name || user?.displayName || "",
   );
   const [city, setCity] = useState(existing?.city || "Vidalia");
-  const [tennis, setTennis] = useState(existing?.plays_tennis ?? false);
-  const [pickleball, setPickleball] = useState(existing?.plays_pickleball ?? true);
+  const [tennis, setTennis] = useState(existing?.plays_tennis ?? true);
+  const [pickleball, setPickleball] = useState(existing?.plays_pickleball ?? false);
   const [tennisLevel, setTennisLevel] = useState(existing?.tennis_level || "3.0");
   const [pbLevel, setPbLevel] = useState(existing?.pickleball_level || "3.0");
   const [partners, setPartners] = useState(existing?.looking_for_partners ?? true);
-  const [coach, setCoach] = useState(existing?.looking_for_coach ?? false);
+  const [coach, setCoach] = useState(existing?.looking_for_coach ?? true);
   const [leagues, setLeagues] = useState(existing?.interested_in_leagues ?? true);
   const [isCoach, setIsCoach] = useState(existing?.is_coach ?? false);
   const [availability, setAvailability] = useState(existing?.availability || "");
@@ -149,8 +149,8 @@ export function Onboarding({
         {existing?.onboarded ? "Your profile" : "Get on Rally"}
       </h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Tennis and pickleball are different games. Put down skill, how long, and how often for each
-        one you play — so people can match you honestly.
+        Tennis and pickleball are different games. Check tennis if you are here for lessons. Check
+        “I coach” if you teach. A parent can book a kid later without the kid needing an account.
       </p>
       <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
         <Field label="Name">

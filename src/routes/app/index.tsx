@@ -30,6 +30,38 @@ function Today() {
         {profile.city}
       </p>
 
+      {profile.is_coach ? (
+        <Card className="mt-8">
+          <p className="text-xs tracking-widest text-muted-foreground uppercase">Coach</p>
+          <p className="mt-2 font-display text-xl">Your desk</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Confirm requests, log Monday and Tuesday, put a kid lesson on the board.
+          </p>
+          <Link to="/app/desk" className="mt-3 flex items-center justify-between text-sm">
+            Open the coach desk
+            <ArrowRight className="size-4" />
+          </Link>
+        </Card>
+      ) : null}
+
+      {profile.looking_for_coach ? (
+        <Card className="mt-8">
+          <p className="text-xs tracking-widest text-muted-foreground uppercase">Lessons</p>
+          <p className="mt-2 font-display text-xl">Book a coach</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            For you or your kid. Ed Smith Complex (Smith Park / Vidalia Rec) is on the court list.
+          </p>
+          <Link
+            to="/app/coaches"
+            search={{ fit: "all" }}
+            className="mt-3 flex items-center justify-between text-sm"
+          >
+            See coaches
+            <ArrowRight className="size-4" />
+          </Link>
+        </Card>
+      ) : null}
+
       {profile.looking_for_partners ? (
         <Card className="mt-8">
           <p className="text-xs tracking-widest text-muted-foreground uppercase">Partners</p>

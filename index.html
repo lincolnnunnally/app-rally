@@ -3,19 +3,111 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rally — Vidalia tennis + pickleball</title>
-  <meta name="description" content="Vidalia tennis and pickleball. Find a hitting partner. Book a lesson. Start a league." />
+  <title>Rally — Vidalia tennis and pickleball lessons</title>
+  <meta name="description" content="Book a tennis or pickleball lesson in Vidalia. Hitting partners, court time, and coaching with Lincoln." />
+  <link rel="canonical" href="https://rally.unitedundergod.org/" />
   <style>
-    body{margin:0;background:#0e1512;color:#eef2ee;font-family:Georgia,serif;padding:48px 24px;max-width:40rem}
-    h1{color:#e6a93a;margin:0 0 12px}
-    p{line-height:1.5;color:#c9d4cc}
-    a{color:#34c0ad}
-    .note{margin-top:28px;font-size:.95rem;color:#9aa89f}
+    :root { --ink:#10231c; --muted:#4d635a; --gold:#c4892a; --court:#1f6b4a; --bg:#f4f1e8; --card:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Georgia, "Times New Roman", serif; background:var(--bg); color:var(--ink); }
+    header { background:var(--ink); color:#f4f1e8; padding:28px 20px 36px; }
+    header, main, footer { max-width: 40rem; }
+    header { max-width: none; }
+    .wrap { max-width: 40rem; margin: 0 auto; }
+    h1 { font-size: 2.1rem; margin: 0 0 8px; color: var(--gold); }
+    .lede { margin:0; line-height:1.45; color:#d7e4dc; }
+    main { padding: 28px 20px 48px; }
+    h2 { font-size: 1.25rem; margin: 28px 0 10px; }
+    p, li { line-height: 1.5; color: var(--muted); }
+    .card { background: var(--card); border: 1px solid #e2dcc8; border-radius: 12px; padding: 16px 18px; margin: 12px 0; }
+    .card b { color: var(--ink); }
+    form { display: grid; gap: 10px; margin-top: 12px; }
+    label { font-size: .85rem; color: var(--ink); }
+    input, select, textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #cfc7b0; border-radius: 8px;
+      font: inherit; background: #fff;
+    }
+    button, .btn {
+      display: inline-block; background: var(--court); color: #fff; border: 0; border-radius: 999px;
+      padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none;
+    }
+    .note { font-size: .92rem; }
+    .ok { color: var(--court); font-weight: 700; }
+    footer { padding: 0 20px 40px; font-size: .85rem; color: var(--muted); }
   </style>
 </head>
 <body>
-  <h1>Rally</h1>
-  <p>Vidalia tennis and pickleball. Find a hitting partner. Book a lesson. Start a league.</p>
-  <p class="note">Host: rally.unitedundergod.org — brand work still to port. This placeholder holds the name.</p>
+  <header>
+    <div class="wrap">
+      <h1>Rally</h1>
+      <p class="lede">Vidalia tennis and pickleball. Book a lesson. Find a hitting partner. Use the court.</p>
+    </div>
+  </header>
+  <main class="wrap">
+    <p>This is the working door — not a second app. Next week’s tennis lessons get booked here.</p>
+
+    <div class="card">
+      <b>Tennis lesson</b>
+      <p>Stroke work, match play, or a first session. Time is set after you send the request. Pay at the court, or I’ll send a card link once the time is locked. I will not take a card until we have a time.</p>
+    </div>
+    <div class="card">
+      <b>Pickleball lesson or hitting</b>
+      <p>Beginner through match play. Same booking path.</p>
+    </div>
+    <div class="card">
+      <b>Hitting partner / court time</b>
+      <p>Need someone to hit with, or a court window? Say so in the form. This is not a public reservation system yet — I confirm by text.</p>
+    </div>
+
+    <h2>Request a time</h2>
+    <p class="note">Leave your name and number. I text back to lock the hour. No fake “booked” screen.</p>
+    <form id="book" action="mailto:lincoln.nunnally@gmail.com" method="get" enctype="text/plain">
+      <input type="hidden" name="subject" value="Rally lesson request" />
+      <label>Name <input name="name" required autocomplete="name" /></label>
+      <label>Phone <input name="phone" required type="tel" autocomplete="tel" /></label>
+      <label>Email <input name="email" type="email" autocomplete="email" /></label>
+      <label>What do you want
+        <select name="kind" required>
+          <option value="">Choose…</option>
+          <option>Tennis lesson</option>
+          <option>Pickleball lesson</option>
+          <option>Hitting partner</option>
+          <option>Court time</option>
+        </select>
+      </label>
+      <label>Preferred days / times
+        <textarea name="when" rows="3" required placeholder="e.g. Tuesday after 4, or Saturday morning"></textarea>
+      </label>
+      <label>Anything I should know
+        <textarea name="notes" rows="2" placeholder="Level, lefty, first lesson…"></textarea>
+      </label>
+      <button type="submit">Send request</button>
+      <p class="note" id="status"></p>
+    </form>
+  </main>
+  <footer class="wrap">
+    Rally is part of United Under God. Host: rally.unitedundergod.org
+  </footer>
+  <script>
+    const form = document.getElementById("book");
+    const status = document.getElementById("status");
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      const data = new FormData(form);
+      const lines = [
+        "Rally request",
+        "Name: " + data.get("name"),
+        "Phone: " + data.get("phone"),
+        "Email: " + (data.get("email") || "—"),
+        "Kind: " + data.get("kind"),
+        "When: " + data.get("when"),
+        "Notes: " + (data.get("notes") || "—")
+      ];
+      const body = encodeURIComponent(lines.join("\n"));
+      status.textContent = "Opening your email so I get this. If nothing opens, text me the same details.";
+      status.className = "note ok";
+      window.location.href = "mailto:lincoln.nunnally@gmail.com?subject=" + encodeURIComponent("Rally lesson request") + "&body=" + body;
+    });
+  </script>
 </body>
 </html>

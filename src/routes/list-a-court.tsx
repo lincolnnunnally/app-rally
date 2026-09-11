@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BOOKING_MODES, COURT_KINDS } from "@/lib/rally";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { submitCourt } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/list-a-court")({
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/list-a-court")({
 
 function ListACourt() {
   const navigate = useNavigate();
+  const { user, isPending } = useCurrentUserState();
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -94,8 +96,25 @@ function ListACourt() {
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Rally is the app. The rec, the club, the school — those are facilities listed on it. Add
           one and Rally starts taking reservations, or holding a window for a call, the same day.
+          Listing is free. It does require an account so the board is not anonymous spam.
         </p>
 
+        {!isPending && !user ? (
+          <Card className="mt-8">
+            <p className="font-display text-xl">Join to list a court</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Create an account, then come back here. The listing form is the same for recs, clubs,
+              schools, and a court you already have a key to.
+            </p>
+            <Button asChild className="mt-4">
+              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+                Create an account
+              </Link>
+            </Button>
+          </Card>
+        ) : null}
+
+        {user ? (
         <Card className="mt-8">
           <form className="flex flex-col gap-3" onSubmit={(e) => void onSubmit(e)}>
             <Field label="Court or facility name">
@@ -174,6 +193,7 @@ function ListACourt() {
             </Button>
           </form>
         </Card>
+        ) : null}
       </main>
     </PublicChrome>
   );

@@ -92,8 +92,22 @@ function Play() {
             </Button>
           </Card>
         ))}
+        {sessions.isPending ? (
+          <p className="text-sm text-muted-foreground">Loading the board…</p>
+        ) : null}
+        {sessions.isError ? (
+          <p className="text-sm text-destructive">
+            Could not load open play. {sessions.error instanceof Error ? sessions.error.message : ""}
+          </p>
+        ) : null}
         {sessions.isSuccess && filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing posted in that filter. Host one.</p>
+          <Card>
+            <p className="font-display text-xl">Nothing posted yet</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Empty stays empty until someone hosts a session. Rec hours also show on Today when they
+              are on the board.
+            </p>
+          </Card>
         ) : null}
       </div>
     </div>

@@ -135,15 +135,51 @@ function CourtPage() {
       <ReviewBlock subjectType="facility" subjectId={String(c.id)} noun={c.name} />
 
       <div className="mt-8 flex flex-wrap gap-2">
-        <Button asChild>
-          {user ? (
-            <Link to="/app/courts">Reserve on Rally</Link>
+        {c.status === "coming" ? (
+          c.manager_phone ? (
+            <Button asChild>
+              <a href={`tel:${c.manager_phone}`}>Call {c.manager_name ?? "the facility"}</a>
+            </Button>
           ) : (
-            <Link to="/login" search={{ ref: undefined, mode: "up" }}>
-              Reserve on Rally
+            <Button asChild variant="secondary">
+              <Link to="/where/$city" params={{ city }}>
+                Watch this board
+              </Link>
+            </Button>
+          )
+        ) : c.booking_mode === "claim" ? (
+          <Button asChild>
+            {user ? (
+              <Link to="/app/courts">Reserve on Rally</Link>
+            ) : (
+              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+                Reserve on Rally
+              </Link>
+            )}
+          </Button>
+        ) : c.booking_mode === "call" ? (
+          c.manager_phone ? (
+            <Button asChild>
+              <a href={`tel:${c.manager_phone}`}>Call to lock it</a>
+            </Button>
+          ) : (
+            <Button asChild>
+              {user ? (
+                <Link to="/app/courts">Hold a window</Link>
+              ) : (
+                <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+                  Join to hold a window
+                </Link>
+              )}
+            </Button>
+          )
+        ) : (
+          <Button asChild variant="secondary">
+            <Link to="/where/$city" params={{ city }}>
+              Walk-up — no reservation
             </Link>
-          )}
-        </Button>
+          </Button>
+        )}
         <Button asChild variant="outline">
           <Link to="/list-a-court">List another court</Link>
         </Button>

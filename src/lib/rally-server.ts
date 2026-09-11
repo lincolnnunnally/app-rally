@@ -2128,12 +2128,12 @@ export const registerCourt = createServerFn({ method: "POST" }).middleware([auth
 		public: !result.court.is_other
 	};
 });
-export const submitCourt = createServerFn({ method: "POST" }).validator(courtSubmitZ).handler(async ({ data }) => {
+export const submitCourt = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(courtSubmitZ).handler(async ({ context, data }) => {
 	const sql = await getSql();
 	await ensureSeed(sql);
 	const result = await insertListedCourt(sql, {
 		...data,
-		addedBy: null
+		addedBy: context.userId
 	});
 	return {
 		id: result.court.id,

@@ -110,7 +110,6 @@ function createNeonSql(): Promise<Sql> {
       connectionString: connectionStringForPg(databaseUrl!),
       ssl: { rejectUnauthorized: false },
       max: 4,
-      options: "-c search_path=rally,public",
     });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const client = await pool.connect();

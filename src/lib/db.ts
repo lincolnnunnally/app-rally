@@ -110,13 +110,17 @@ function createNeonSql(): Promise<Sql> {
       connectionString: connectionStringForPg(databaseUrl!),
       ssl: { rejectUnauthorized: false },
       max: 4,
-    });
-    pool.on("connect", (client) => {
-      void client.query("set search_path to rally, public");
+      options: "-c search_path=rally,public",
     });
     return toSql(async <T>(text: string, params: unknown[]) => {
-      const res = await pool.query(text, params);
-      return res.rows as T[];
+      const client = await pool.connect();
+      try {
+        await client.query("set search_path to rally, public");
+        const res = await client.query(text, params);
+        return res.rows as T[];
+      } finally {
+        client.release();
+      }
     });
   })().catch((err) => {
     globalRef.__pgSqlPromise__ = undefined;

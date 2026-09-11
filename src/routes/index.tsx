@@ -197,9 +197,13 @@ function Home() {
             Card checkout is not on yet.
           </p>
           <Button asChild className="mt-6">
-            <Link to="/login" search={{ ref: undefined, mode: "up" }}>
-              Open a coach desk
-            </Link>
+            {user ? (
+              <Link to="/app/desk">Open a coach desk</Link>
+            ) : (
+              <Link to="/login" search={{ ref: undefined, mode: "up" }}>
+                Open a coach desk
+              </Link>
+            )}
           </Button>
         </div>
       </section>

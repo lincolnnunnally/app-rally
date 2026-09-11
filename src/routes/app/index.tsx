@@ -30,6 +30,20 @@ function Today() {
         {profile.city}
       </p>
 
+      {profile.looking_for_partners ? (
+        <Card className="mt-8">
+          <p className="text-xs tracking-widest text-muted-foreground uppercase">Partners</p>
+          <p className="mt-2 font-display text-xl">Who wants a hit</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Skill, years, and a time — not a rumor in a chat. Empty until a real player joins.
+          </p>
+          <Link to="/app/partners" className="mt-3 flex items-center justify-between text-sm">
+            Open the partner board
+            <ArrowRight className="size-4" />
+          </Link>
+        </Card>
+      ) : null}
+
       {feed.isPending ? (
         <div className="mt-8 grid gap-3">
           <Skeleton className="h-24" />

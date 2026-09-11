@@ -174,6 +174,7 @@ const database = databaseUrl
       const pool = new Pool({
         connectionString,
         ssl: { rejectUnauthorized: false },
+        options: "-c search_path=rally,public",
       });
       pool.on("connect", (client) => {
         void client.query("set search_path to rally, public");

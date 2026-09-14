@@ -46,6 +46,7 @@ import {
   PREVIEW_CLIENT_ID,
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
+import { rallyAllowedHosts, rallyTrustedOrigins } from "./trusted-hosts";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
 void ensureDbReady();
@@ -99,26 +100,9 @@ const explicitBaseURL = env("BETTER_AUTH_URL");
 // Explicit `string[]` (not a readonly tuple) — Better Auth's DynamicBaseURLConfig
 // requires a mutable `allowedHosts: string[]`.
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
-// Local `npm run dev` (port 8080 contract). Browsers may send Origin as any of
-// these for the same server — trusting only `localhost` rejects `127.0.0.1` and
-// breaks email/password with "Invalid origin".
-const LOCAL_DEV_ORIGINS: string[] = [
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://[::1]:8080",
-];
 const baseURL = explicitBaseURL ?? {
-  // Include loopback hosts so dynamic baseURL resolves for local email/password
-  // (not only the preview wildcard).
-  allowedHosts: [
-    ...previewAllowedHosts,
-    "localhost",
-    "127.0.0.1",
-    "[::1]",
-    "rally.unitedundergod.org",
-    "app-rally-nine.vercel.app",
-    "app-rally-life-produces-life.vercel.app",
-  ],
+  // Loopback + live custom domain + unique Vercel preview hosts (`*.vercel.app`).
+  allowedHosts: rallyAllowedHosts(previewAllowedHosts),
   // `auto` → trust both http:// and https:// expansions of allowedHosts
   // (preview is https; local dev is http).
   protocol: "auto" as const,
@@ -126,23 +110,13 @@ const baseURL = explicitBaseURL ?? {
 };
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
-// Missing entries here surface as FORBIDDEN "Invalid origin".
-const productionOrigins = [
-  "https://rally.unitedundergod.org",
-  "https://app-rally-nine.vercel.app",
-  "https://app-rally-life-produces-life.vercel.app",
-  "https://app-rally-git-main-life-produces-life.vercel.app",
-];
-const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...productionOrigins, ...LOCAL_DEV_ORIGINS]
-  : [
-      // Host wildcards (matched against Origin's host)
-      ...previewAllowedHosts,
-      // Full-origin wildcards (matched against Origin)
-      ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
-      ...productionOrigins,
-      ...LOCAL_DEV_ORIGINS,
-    ];
+// Always include `*.vercel.app` — unique leftover preview hosts are not in
+// BETTER_AUTH_URL / the hardcoded production list. Missing entries surface as
+// FORBIDDEN "Invalid origin".
+const trustedOrigins: string[] = rallyTrustedOrigins({
+  explicitBaseURL,
+  previewHosts: previewAllowedHosts,
+});
 
 const databaseUrl = env("DATABASE_URL");
 

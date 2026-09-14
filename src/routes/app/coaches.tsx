@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
+import { lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
 import { listCoaches, listMyLessons, requestLesson } from "@/lib/rally-server";
@@ -116,12 +117,17 @@ function Coaches() {
                     {l.for_kind === "child" && l.for_name ? ` · for ${l.for_name}` : ""}
                     {l.series_id ? " · recurring" : ""}
                   </span>
-                  <Badge>{l.status}</Badge>
+                  <Badge>{lessonStatusLabel(l.status)}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatWall(l.starts_at)} · {l.duration_min} min · {l.court_name ?? "Court TBD"}
                   {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
                 </p>
+                <Button size="sm" variant="secondary" className="mt-3" asChild>
+                  <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
+                    Open lesson QR
+                  </Link>
+                </Button>
               </li>
             ))}
           </ul>

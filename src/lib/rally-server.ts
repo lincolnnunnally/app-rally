@@ -15,6 +15,7 @@ import type {
   ReservationRow,
   ReviewRow,
 } from "@/lib/rally";
+import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
 import { RALLY, citySlug, money, parseCerts, parseHonors, slugify, takeCents } from "@/lib/rally";
 
 export type { ReviewRow };
@@ -659,7 +660,9 @@ function billingOf(createdAt: unknown, stored: string, takeThisMonth: number): C
 		stored: plan,
 		trial_ends: `${y}-${m}-${d}`,
 		in_trial: inTrial,
-		take_this_month: takeThisMonth
+		take_this_month: takeThisMonth,
+		cash_app_handle: null,
+		venmo_handle: null
 	};
 }
 async function notify(sql: Sql, userId: string, title: string, body: string, href: string | null) {
@@ -1380,7 +1383,15 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
         and category in ('rally_take', 'rally_monthly')
         and occurred_on >= date_trunc('month', current_date)
     `;
-	const billing = billingOf(coach[0]?.created_at, String(coach[0]?.billing_plan ?? "percent"), num(takeMonth[0]?.n ?? 0));
+	const billing = {
+		...billingOf(coach[0]?.created_at, String(coach[0]?.billing_plan ?? "percent"), num(takeMonth[0]?.n ?? 0)),
+		cash_app_handle: coach[0]?.cash_app_handle == null || String(coach[0].cash_app_handle).trim() === ""
+			? null
+			: String(coach[0].cash_app_handle),
+		venmo_handle: coach[0]?.venmo_handle == null || String(coach[0].venmo_handle).trim() === ""
+			? null
+			: String(coach[0].venmo_handle)
+	};
 	return {
 		coach: coach[0] ? {
 			headline: coach[0].headline == null ? "" : String(coach[0].headline),
@@ -1487,6 +1498,25 @@ export const saveCoachBilling = createServerFn({ method: "POST" }).middleware([a
       where user_id = ${context.userId}
     `;
 	return { ok: true };
+});
+export const saveCoachPayHandles = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	cash_app: z.string().max(80).optional(),
+	venmo: z.string().max(80).optional()
+})).handler(async ({ context, data }) => {
+	const cash = cleanCashAppHandle(data.cash_app ?? "");
+	const venmo = cleanVenmoHandle(data.venmo ?? "");
+	const sql = await getSql();
+	await sql`update profiles set is_coach = true, updated_at = now() where user_id = ${context.userId}`;
+	await sql`
+      insert into coach_profiles (user_id) values (${context.userId})
+      on conflict do nothing
+    `;
+	await sql`
+      update coach_profiles
+      set cash_app_handle = ${cash || null}, venmo_handle = ${venmo || null}
+      where user_id = ${context.userId}
+    `;
+	return { ok: true, cash_app: cash || null, venmo: venmo || null };
 });
 async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): Promise<LessonRow[]> {
 	return (who.coach ? await sql`

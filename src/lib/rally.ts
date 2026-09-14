@@ -556,6 +556,8 @@ export type CoachBilling = {
   trial_ends: string;
   in_trial: boolean;
   take_this_month: number;
+  cash_app_handle: string | null;
+  venmo_handle: string | null;
 };
 
 export function sportLabel(sport: string) {

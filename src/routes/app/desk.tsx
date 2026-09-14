@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor } from "@/components/proof-lists";
-import { CoachInvite, ShareRally } from "@/components/share-rally";
+import { CoachInvite, PayHandles, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
   RALLY,
@@ -34,6 +34,7 @@ import {
   listDirectory,
   logLesson,
   saveCoachBilling,
+  saveCoachPayHandles,
   saveCoachProfile,
   saveCoachService,
   saveProfile,
@@ -246,8 +247,12 @@ function Desk() {
         </TabsContent>
 
         <TabsContent value="books" className="mt-6">
-          {desk.data?.coach && desk.data.billing ? (
-            <BillingCard billing={desk.data.billing} onChanged={refreshDesk} />
+          {desk.data?.billing ? (
+            <BillingCard
+              listed={Boolean(desk.data.coach)}
+              billing={desk.data.billing}
+              onChanged={refreshDesk}
+            />
           ) : null}
           <div className="mb-4">
             <ShareRally code={profile.share_code} creditCents={profile.credit_cents} />
@@ -550,9 +555,11 @@ function ServicesPanel({
 }
 
 function BillingCard({
+  listed,
   billing,
   onChanged,
 }: {
+  listed: boolean;
   billing: CoachBilling;
   onChanged: () => void;
 }) {
@@ -560,6 +567,14 @@ function BillingCard({
     mutationFn: (plan: "percent" | "monthly") => saveCoachBilling({ data: { plan } }),
     onSuccess: () => {
       toast.success("Billing saved.");
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const saveHandles = useMutation({
+    mutationFn: (data: { cash_app: string; venmo: string }) => saveCoachPayHandles({ data }),
+    onSuccess: () => {
+      toast.success("Handles saved.");
       onChanged();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -584,22 +599,31 @@ function BillingCard({
       {billing.take_this_month > 0 ? (
         <p className="mt-2 text-sm">Rally this month: {money(billing.take_this_month)}</p>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant={billing.stored === "percent" ? "default" : "outline"}
-          onClick={() => save.mutate("percent")}
-        >
-          {RALLY.lessonPct}% per lesson
-        </Button>
-        <Button
-          size="sm"
-          variant={billing.stored === "monthly" ? "default" : "outline"}
-          onClick={() => save.mutate("monthly")}
-        >
-          {money(RALLY.monthlyCents)} / month
-        </Button>
-      </div>
+      {listed ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={billing.stored === "percent" ? "default" : "outline"}
+            onClick={() => save.mutate("percent")}
+          >
+            {RALLY.lessonPct}% per lesson
+          </Button>
+          <Button
+            size="sm"
+            variant={billing.stored === "monthly" ? "default" : "outline"}
+            onClick={() => save.mutate("monthly")}
+          >
+            {money(RALLY.monthlyCents)} / month
+          </Button>
+        </div>
+      ) : null}
+      <PayHandles
+        key={`${billing.cash_app_handle ?? ""}:${billing.venmo_handle ?? ""}`}
+        cashApp={billing.cash_app_handle}
+        venmo={billing.venmo_handle}
+        pending={saveHandles.isPending}
+        onSave={(data) => saveHandles.mutate(data)}
+      />
     </Card>
   );
 }

@@ -2,6 +2,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  cashAppDisplay,
+  cashAppHref,
+  rallyQrSrc,
+  venmoDeepHref,
+  venmoDisplay,
+  venmoWebHref,
+} from "@/lib/pay-href";
 import { RALLY, coachInvitePath, money, sharePath } from "@/lib/rally";
 
 export function ShareRally({
@@ -81,7 +91,7 @@ export function CoachInvite({
 
   const path = coachInvitePath(code);
   const url = typeof window === "undefined" ? `https://rally.unitedundergod.org${path}` : `${window.location.origin}${path}`;
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=480x480&margin=8&ecc=M&data=${encodeURIComponent(url)}`;
+  const qrSrc = rallyQrSrc(url);
   const textBody = `Join me on Rally for tennis at Ed Smith (Smith Park / Vidalia Rec). Create your profile here and you'll be on my coaching list — you can also find people to hit with: ${url}`;
 
   async function copy() {
@@ -149,6 +159,161 @@ export function CoachInvite({
         </Button>
       </div>
     </Card>
+  );
+}
+
+export function PayHandles({
+  cashApp,
+  venmo,
+  onSave,
+  pending,
+}: {
+  cashApp: string | null;
+  venmo: string | null;
+  onSave: (data: { cash_app: string; venmo: string }) => void;
+  pending?: boolean;
+}) {
+  const [amount, setAmount] = useState("");
+  const cashHref = cashAppHref(cashApp ?? "", amount);
+  const venmoWeb = venmoWebHref(venmo ?? "");
+  const venmoDeep = venmoDeepHref(venmo ?? "", {
+    amount,
+    note: "Rally lesson",
+  });
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <p className="text-xs tracking-widest text-muted-foreground uppercase">Pay links</p>
+      <h3 className="mt-2 font-display text-xl">Cash App and Venmo</h3>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        Your handles. Pull up the QR on this screen — they open Cash App or Venmo. Rally
+        still does not take a card in the app.
+      </p>
+      <form
+        className="mt-4 grid gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          onSave({
+            cash_app: String(f.get("cash_app") || ""),
+            venmo: String(f.get("venmo") || ""),
+          });
+        }}
+      >
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cash_app">Cash App $Cashtag</Label>
+          <Input
+            id="cash_app"
+            name="cash_app"
+            defaultValue={cashApp ? cashAppDisplay(cashApp) : ""}
+            placeholder="$yourname"
+            autoComplete="off"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="venmo">Venmo username</Label>
+          <Input
+            id="venmo"
+            name="venmo"
+            defaultValue={venmo ? venmoDisplay(venmo) : ""}
+            placeholder="@yourname"
+            autoComplete="off"
+          />
+        </div>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save handles"}
+        </Button>
+      </form>
+
+      {cashHref || venmoWeb ? (
+        <div className="mt-4 grid gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pay_amount">Amount on the QR (optional)</Label>
+            <Input
+              id="pay_amount"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Leave blank, or 40"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {cashHref ? (
+              <PayQr
+                title="Cash App"
+                handle={cashAppDisplay(cashApp ?? "")}
+                href={cashHref}
+                code="cash-app"
+              />
+            ) : null}
+            {venmoWeb ? (
+              <PayQr
+                title="Venmo"
+                handle={venmoDisplay(venmo ?? "")}
+                href={venmoWeb}
+                deepHref={venmoDeep ?? undefined}
+                code="venmo"
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PayQr({
+  title,
+  handle,
+  href,
+  deepHref,
+  code,
+}: {
+  title: string;
+  handle: string;
+  href: string;
+  deepHref?: string;
+  code: string;
+}) {
+  const qrSrc = rallyQrSrc(href);
+  return (
+    <div>
+      <p className="text-sm">
+        {title} · {handle}
+      </p>
+      <img
+        src={qrSrc}
+        alt={`QR code to pay ${handle} on ${title}`}
+        width={200}
+        height={200}
+        className="mt-2 rounded-md border border-border bg-white p-2"
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {deepHref ? (
+          <Button size="sm" asChild>
+            <a href={deepHref}>Open {title}</a>
+          </Button>
+        ) : (
+          <Button size="sm" asChild>
+            <a href={href} target="_blank" rel="noreferrer">
+              Open {title}
+            </a>
+          </Button>
+        )}
+        {deepHref ? (
+          <Button size="sm" variant="secondary" asChild>
+            <a href={href} target="_blank" rel="noreferrer">
+              Open on the web
+            </a>
+          </Button>
+        ) : null}
+        <Button size="sm" variant="ghost" asChild>
+          <a href={qrSrc} download={`${code}-rally-pay-qr.png`} target="_blank" rel="noreferrer">
+            Save QR
+          </a>
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
-import type { CertItem, CoachBilling, CoachService, Court, HonorItem, Profile } from "@/lib/rally";
+import { lessonIsOpen } from "@/lib/lesson-status";
+import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor } from "@/components/proof-lists";
-import { CoachInvite, PayHandles, ShareRally } from "@/components/share-rally";
+import { CoachInvite, LessonScanQr, PayHandleShow, PayHandles, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
   RALLY,
@@ -48,14 +49,19 @@ function Desk() {
   const qc = useQueryClient();
   const desk = useQuery({ queryKey: ["desk"], queryFn: () => getCoachDesk() });
   const directory = useQuery({ queryKey: ["directory"], queryFn: () => listDirectory() });
+  const [payFor, setPayFor] = useState<LessonRow | null>(null);
   const setStatus = useMutation({
-    mutationFn: (data: { id: number; status: "confirmed" | "declined" | "completed" | "cancelled" }) =>
-      setLessonStatus({ data }),
-    onSuccess: () => {
+    mutationFn: (data: {
+      id: number;
+      status: "confirmed" | "declined" | "completed" | "cancelled" | "checked_in";
+    }) => setLessonStatus({ data }),
+    onSuccess: (_, vars) => {
       void qc.invalidateQueries({ queryKey: ["desk"] });
       void qc.invalidateQueries({ queryKey: ["home"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
-      toast.success("Updated.");
+      const lesson = (desk.data?.lessons ?? []).find((l) => l.id === vars.id);
+      if (vars.status === "completed" && lesson) setPayFor(lesson);
+      toast.success(vars.status === "checked_in" ? "Checked in." : vars.status === "completed" ? "Checked out." : "Updated.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -68,7 +74,7 @@ function Desk() {
     void qc.invalidateQueries({ queryKey: ["notices"] });
   };
 
-  const upcoming = (desk.data?.lessons ?? []).filter((l) => l.status === "confirmed");
+  const upcoming = (desk.data?.lessons ?? []).filter((l) => lessonIsOpen(l.status));
   const requests = (desk.data?.lessons ?? []).filter((l) => l.status === "requested");
   const pipeline = desk.data?.pipeline;
 
@@ -167,37 +173,77 @@ function Desk() {
                 Nothing confirmed yet. Log a lesson or wait on a request.
               </p>
             ) : (
-              <ul className="mt-3 flex flex-col gap-2">
+              <ul className="mt-3 flex flex-col gap-3">
                 {upcoming.map((l) => (
-                  <li key={l.id} className="flex flex-col gap-2 rounded-lg border border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                    <span>
-                      {lessonWho(l)} · {formatWall(l.starts_at)}
-                      {l.service_name ? ` · ${l.service_name}` : ""}
-                      {l.series_id ? " · recurring" : ""}
-                      {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
-                      {l.rally_take_cents > 0 ? ` · Rally ${money(l.rally_take_cents)}` : ""}
-                    </span>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setStatus.mutate({ id: l.id, status: "completed" })}
-                      >
-                        Mark done
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setStatus.mutate({ id: l.id, status: "cancelled" })}
-                      >
-                        Cancel
-                      </Button>
+                  <li key={l.id} className="rounded-lg border border-border px-4 py-3 text-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <span>
+                        {lessonWho(l)} · {formatWall(l.starts_at)}
+                        {l.service_name ? ` · ${l.service_name}` : ""}
+                        {l.series_id ? " · recurring" : ""}
+                        {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
+                        {l.rally_take_cents > 0 ? ` · Rally ${money(l.rally_take_cents)}` : ""}
+                        {l.status === "checked_in" ? " · checked in" : ""}
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {l.status === "confirmed" ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setStatus.mutate({ id: l.id, status: "checked_in" })}
+                          >
+                            Check in
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setStatus.mutate({ id: l.id, status: "completed" })}
+                        >
+                          Check out
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setStatus.mutate({ id: l.id, status: "cancelled" })}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                    <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />
+                    <div className="mt-4 border-t border-border pt-3">
+                      <p className="text-xs tracking-widest text-muted-foreground uppercase">
+                        Pay now or charge at the end
+                      </p>
+                      <PayHandleShow
+                        cashApp={desk.data?.billing.cash_app_handle ?? null}
+                        venmo={desk.data?.billing.venmo_handle ?? null}
+                        amount={l.price_cents != null ? l.price_cents / 100 : ""}
+                        note="Rally lesson"
+                      />
                     </div>
                   </li>
                 ))}
               </ul>
             )}
           </section>
+
+          {payFor ? (
+            <Card className="mt-8">
+              <p className="text-xs tracking-widest text-muted-foreground uppercase">Pay prompt</p>
+              <h2 className="mt-2 font-display text-2xl">Lesson complete — pull up the handles</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Same Cash App and Venmo QR as Books. No card checkout.
+              </p>
+              <PayHandleShow
+                cashApp={desk.data?.billing.cash_app_handle ?? null}
+                venmo={desk.data?.billing.venmo_handle ?? null}
+                amount={payFor.price_cents != null ? payFor.price_cents / 100 : ""}
+                note="Rally lesson"
+              />
+            </Card>
+          ) : null}
 
           <section className="mt-10">
             <h2 className="font-display text-2xl">Roster</h2>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { rememberCoach, rememberRef } from "@/lib/rally";
+import { consumeAppNext, rememberCoach, rememberRef } from "@/lib/rally";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -41,23 +41,24 @@ function Login() {
     setError(null);
     setBusy(true);
     try {
+      const dest = consumeAppNext() ?? "/app";
       if (mode === "up") {
         const res = await authClient.signUp.email({
           email,
           password,
           name: name || email.split("@")[0],
-          callbackURL: "/app",
+          callbackURL: dest,
         });
         if (res.error) throw new Error(res.error.message || "Could not create account");
       } else {
         const res = await authClient.signIn.email({
           email,
           password,
-          callbackURL: "/app",
+          callbackURL: dest,
         });
         if (res.error) throw new Error(res.error.message || "Could not sign in");
       }
-      window.location.assign("/app");
+      window.location.assign(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
@@ -137,7 +138,7 @@ function Login() {
                 key={p.providerId}
                 type="button"
                 variant="secondary"
-                onClick={() => signIn(p.providerId, { callbackURL: "/app" })}
+                onClick={() => signIn(p.providerId, { callbackURL: consumeAppNext() ?? "/app" })}
               >
                 Continue with {p.label}
               </Button>

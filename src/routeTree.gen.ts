@@ -16,9 +16,9 @@ import { Route as ListACourtRouteImport } from './routes/list-a-court'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as TermsRouteImport } from './routes/terms'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WhereRouteImport } from './routes/where'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppCoachesRouteImport } from './routes/app/coaches'
@@ -36,6 +36,7 @@ import { Route as WhereCityRouteImport } from './routes/where.$city'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppLeaguesIndexRouteImport } from './routes/app/leagues.index'
 import { Route as AppLeaguesIdRouteImport } from './routes/app/leagues.$id'
+import { Route as AppLessonsIdRouteImport } from './routes/app/lessons.$id'
 import { Route as WhereCityIndexRouteImport } from './routes/where.$city.index'
 import { Route as WhereCitySlugRouteImport } from './routes/where.$city.$slug'
 
@@ -74,11 +75,6 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
@@ -87,6 +83,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WhereRoute = WhereRouteImport.update({
@@ -174,6 +175,11 @@ const AppLeaguesIdRoute = AppLeaguesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppLeaguesRoute,
 } as any)
+const AppLessonsIdRoute = AppLessonsIdRouteImport.update({
+  id: '/lessons/$id',
+  path: '/lessons/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const WhereCityIndexRoute = WhereCityIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -193,9 +199,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/terms': typeof TermsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/where': typeof WhereRouteWithChildren
   '/app/coaches': typeof AppCoachesRoute
   '/app/courts': typeof AppCourtsRoute
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
+  '/app/lessons/$id': typeof AppLessonsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues/': typeof AppLeaguesIndexRoute
   '/where/$city/': typeof WhereCityIndexRoute
@@ -223,9 +230,9 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/terms': typeof TermsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/app/coaches': typeof AppCoachesRoute
   '/app/courts': typeof AppCourtsRoute
   '/app/desk': typeof AppDeskRoute
@@ -239,6 +246,7 @@ export interface FileRoutesByTo {
   '/where': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
+  '/app/lessons/$id': typeof AppLessonsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues': typeof AppLeaguesIndexRoute
   '/where/$city': typeof WhereCityIndexRoute
@@ -252,9 +260,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/terms': typeof TermsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/where': typeof WhereRouteWithChildren
   '/app/coaches': typeof AppCoachesRoute
   '/app/courts': typeof AppCourtsRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
+  '/app/lessons/$id': typeof AppLessonsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues/': typeof AppLeaguesIndexRoute
   '/where/$city/': typeof WhereCityIndexRoute
@@ -285,9 +294,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/reset-password'
-    | '/terms'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/terms'
     | '/where'
     | '/app/coaches'
     | '/app/courts'
@@ -304,6 +313,7 @@ export interface FileRouteTypes {
     | '/where/'
     | '/api/auth/$'
     | '/app/leagues/$id'
+    | '/app/lessons/$id'
     | '/where/$city/$slug'
     | '/app/leagues/'
     | '/where/$city/'
@@ -315,9 +325,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/reset-password'
-    | '/terms'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/terms'
     | '/app/coaches'
     | '/app/courts'
     | '/app/desk'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/where'
     | '/api/auth/$'
     | '/app/leagues/$id'
+    | '/app/lessons/$id'
     | '/where/$city/$slug'
     | '/app/leagues'
     | '/where/$city'
@@ -343,9 +354,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/reset-password'
-    | '/terms'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/terms'
     | '/where'
     | '/app/coaches'
     | '/app/courts'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/where/'
     | '/api/auth/$'
     | '/app/leagues/$id'
+    | '/app/lessons/$id'
     | '/where/$city/$slug'
     | '/app/leagues/'
     | '/where/$city/'
@@ -375,9 +387,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  TermsRoute: typeof TermsRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TermsRoute: typeof TermsRoute
   WhereRoute: typeof WhereRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -433,13 +445,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/robots.txt': {
       id: '/robots.txt'
       path: '/robots.txt'
@@ -452,6 +457,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/where': {
@@ -573,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLeaguesIdRouteImport
       parentRoute: typeof AppLeaguesRoute
     }
+    '/app/lessons/$id': {
+      id: '/app/lessons/$id'
+      path: '/lessons/$id'
+      fullPath: '/app/lessons/$id'
+      preLoaderRoute: typeof AppLessonsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/where/$city/': {
       id: '/where/$city/'
       path: '/'
@@ -616,6 +635,7 @@ interface AppRouteChildren {
   AppProgressRoute: typeof AppProgressRoute
   AppYouRoute: typeof AppYouRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppLessonsIdRoute: typeof AppLessonsIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -630,6 +650,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProgressRoute: AppProgressRoute,
   AppYouRoute: AppYouRoute,
   AppIndexRoute: AppIndexRoute,
+  AppLessonsIdRoute: AppLessonsIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -668,9 +689,9 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  TermsRoute: TermsRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TermsRoute: TermsRoute,
   WhereRoute: WhereRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

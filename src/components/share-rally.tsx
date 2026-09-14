@@ -12,6 +12,7 @@ import {
   venmoDisplay,
   venmoWebHref,
 } from "@/lib/pay-href";
+import { lessonScanPath } from "@/lib/lesson-status";
 import { RALLY, coachInvitePath, money, sharePath } from "@/lib/rally";
 
 export function ShareRally({
@@ -258,6 +259,83 @@ export function PayHandles({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Display-only leftover-1 handle QR — pay now or after check-out. */
+export function PayHandleShow({
+  cashApp,
+  venmo,
+  amount,
+  note,
+}: {
+  cashApp: string | null;
+  venmo: string | null;
+  amount?: string | number | null;
+  note?: string;
+}) {
+  const cashHref = cashAppHref(cashApp ?? "", amount);
+  const venmoWeb = venmoWebHref(venmo ?? "");
+  const venmoDeep = venmoDeepHref(venmo ?? "", {
+    amount,
+    note: note ?? "Rally lesson",
+  });
+  if (!cashHref && !venmoWeb) {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground">
+        No Cash App or Venmo handle on the books yet. The coach saves them on Desk → Books.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      {cashHref ? (
+        <PayQr
+          title="Cash App"
+          handle={cashAppDisplay(cashApp ?? "")}
+          href={cashHref}
+          code="cash-app"
+        />
+      ) : null}
+      {venmoWeb ? (
+        <PayQr
+          title="Venmo"
+          handle={venmoDisplay(venmo ?? "")}
+          href={venmoWeb}
+          deepHref={venmoDeep ?? undefined}
+          code="venmo"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function LessonScanQr({
+  lessonId,
+  label,
+}: {
+  lessonId: number;
+  label: string;
+}) {
+  const path = lessonScanPath(lessonId);
+  const url =
+    typeof window === "undefined" ? `https://rally.unitedundergod.org${path}` : `${window.location.origin}${path}`;
+  const qrSrc = rallyQrSrc(url);
+  return (
+    <div className="mt-3">
+      <p className="text-xs tracking-widest text-muted-foreground uppercase">Lesson QR</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Student scans to check in or check out. Same qrserver primitive as the invite QR.
+      </p>
+      <img
+        src={qrSrc}
+        alt={`QR code for ${label}`}
+        width={200}
+        height={200}
+        className="mt-2 rounded-md border border-border bg-white p-2"
+      />
+      <p className="mt-2 break-all font-mono text-xs">{url}</p>
     </div>
   );
 }

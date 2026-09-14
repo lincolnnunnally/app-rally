@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RallyProvider } from "@/lib/rally-context";
 import { AppShell } from "@/components/app-shell";
@@ -6,6 +6,7 @@ import { Onboarding } from "@/components/onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { rememberAppNext } from "@/lib/rally";
 import { bootstrap } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/app")({
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/app")({
 
 function AppGate() {
   const { user, isPending } = useCurrentUserState();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const qc = useQueryClient();
   const boot = useQuery({
     queryKey: ["bootstrap"],
@@ -22,7 +24,10 @@ function AppGate() {
   });
 
   if (isPending) return <ShellSkeleton />;
-  if (!user) return <RedirectToSignIn />;
+  if (!user) {
+    rememberAppNext(pathname);
+    return <RedirectToSignIn />;
+  }
   if (boot.isPending) return <ShellSkeleton />;
   if (boot.isError) {
     return (

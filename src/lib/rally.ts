@@ -71,6 +71,31 @@ export function loginSearch(mode?: "in" | "up", ref?: string, coach?: string): L
   return { ref, coach, mode };
 }
 
+const NEXT_KEY = "rally_next";
+
+/** Only in-app paths — leftover scan URLs after sign-in. */
+export function safeAppNext(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const path = raw.trim();
+  if (!path.startsWith("/app")) return undefined;
+  if (path.startsWith("//") || path.includes("://")) return undefined;
+  return path;
+}
+
+export function rememberAppNext(path?: string | null) {
+  if (typeof window === "undefined") return;
+  const next = safeAppNext(path);
+  if (next) window.sessionStorage.setItem(NEXT_KEY, next);
+  else window.sessionStorage.removeItem(NEXT_KEY);
+}
+
+export function consumeAppNext(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const next = safeAppNext(window.sessionStorage.getItem(NEXT_KEY));
+  window.sessionStorage.removeItem(NEXT_KEY);
+  return next;
+}
+
 
 export const STALL_AREAS = [
   {

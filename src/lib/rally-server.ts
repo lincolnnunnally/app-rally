@@ -16,6 +16,7 @@ import type {
   ReviewRow,
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
+import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { RALLY, citySlug, money, parseCerts, parseHonors, slugify, takeCents } from "@/lib/rally";
 
 export type { ReviewRow };
@@ -1330,7 +1331,7 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
              p.pickleball_frequency, p.tennis_experience, p.pickleball_experience, p.tennis_results, p.pickleball_results
       from lessons l
       join profiles p on p.user_id = l.player_user_id
-      where l.coach_user_id = ${context.userId} and l.status in ('confirmed', 'completed')
+      where l.coach_user_id = ${context.userId} and l.status in ('confirmed', 'checked_in', 'completed')
       group by p.user_id, p.display_name, p.plays_tennis, p.plays_pickleball, p.pickleball_level, p.tennis_level, p.years_playing,
                p.dupr, p.utr, p.experience, p.accomplishments, p.coach_note,
                p.tennis_years, p.pickleball_years, p.tennis_times, p.pickleball_times, p.tennis_frequency,
@@ -1350,14 +1351,14 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
 	const thisWeek = await sql`
       select count(*)::int as n from lessons
       where coach_user_id = ${context.userId}
-        and status = 'confirmed'
+        and status in ('confirmed', 'checked_in')
         and starts_at >= now()
         and starts_at < now() + interval '7 days'
     `;
 	const nextWeek = await sql`
       select count(*)::int as n from lessons
       where coach_user_id = ${context.userId}
-        and status = 'confirmed'
+        and status in ('confirmed', 'checked_in')
         and starts_at >= now() + interval '7 days'
         and starts_at < now() + interval '14 days'
     `;
@@ -1549,7 +1550,11 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
         where l.player_user_id = ${who.player}
         order by l.starts_at desc
         limit 40
-      `).map((r) => ({
+      `).map(mapLesson);
+}
+
+function mapLesson(r: Record<string, unknown>): LessonRow {
+	return {
 		id: num(r.id),
 		coach_user_id: String(r.coach_user_id),
 		coach_name: r.coach_name == null ? "Coach" : String(r.coach_name),
@@ -1572,10 +1577,47 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
 		rally_take_cents: num(r.rally_take_cents ?? 0),
 		for_kind: r.for_kind === "child" ? "child" : "self",
 		for_name: r.for_name == null ? null : String(r.for_name)
-	}));
+	};
 }
 export const listMyLessons = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
 	return loadLessons(await getSql(), { player: context.userId });
+});
+export const getLessonScan = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number()
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const row = (await sql`
+      select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
+             l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
+             l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
+             l.for_kind, l.for_name,
+             c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
+             sv.name as service_name,
+             cp.cash_app_handle, cp.venmo_handle
+      from lessons l
+      left join courts c on c.id = l.court_id
+      left join profiles pc on pc.user_id = l.coach_user_id
+      left join profiles pp on pp.user_id = l.player_user_id
+      left join coach_services sv on sv.id = l.service_id
+      left join coach_profiles cp on cp.user_id = l.coach_user_id
+      where l.id = ${data.id}
+      limit 1
+    `)[0];
+	if (!row) throw new Error("Lesson not found");
+	const lesson = mapLesson(row);
+	if (context.userId !== lesson.coach_user_id && context.userId !== lesson.player_user_id) {
+		throw new Error("This lesson is not yours.");
+	}
+	return {
+		lesson,
+		role: context.userId === lesson.coach_user_id ? "coach" as const : "player" as const,
+		cash_app_handle: row.cash_app_handle == null || String(row.cash_app_handle).trim() === ""
+			? null
+			: String(row.cash_app_handle),
+		venmo_handle: row.venmo_handle == null || String(row.venmo_handle).trim() === ""
+			? null
+			: String(row.venmo_handle)
+	};
 });
 export const requestLesson = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	coach_user_id: z.string().min(1),
@@ -1687,23 +1729,39 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 		"confirmed",
 		"declined",
 		"cancelled",
-		"completed"
+		"completed",
+		"checked_in"
 	])
 })).handler(async ({ context, data }) => {
 	const sql = await getSql();
 	const lesson = (await sql`
-      select coach_user_id, player_user_id, price_cents, facility_fee_cents, facility_cut_cents, sport
+      select coach_user_id, player_user_id, price_cents, facility_fee_cents, facility_cut_cents, sport, status
       from lessons where id = ${data.id}
     `)[0];
 	if (!lesson) throw new Error("Lesson not found");
 	const coach = String(lesson.coach_user_id);
 	const player = String(lesson.player_user_id);
-	if (data.status === "cancelled") {
-		if (context.userId !== coach && context.userId !== player) throw new Error("Unauthorized");
-	} else if (context.userId !== coach) throw new Error("Only the coach can confirm, decline, or complete.");
+	const gate = canActorSetLessonStatus({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		current: String(lesson.status),
+		next: data.status
+	});
+	if (!gate.ok) throw new Error(gate.error);
 	await sql`update lessons set status = ${data.status} where id = ${data.id}`;
 	if (data.status === "confirmed") await notify(sql, player, "Lesson confirmed", `Your ${lesson.sport} lesson is on the board.`, "/app/coaches");
 	else if (data.status === "declined") await notify(sql, player, "Lesson declined", "The coach declined that time. Try another window.", "/app/coaches");
+	else if (data.status === "checked_in") {
+		const other = context.userId === coach ? player : coach;
+		await notify(
+			sql,
+			other,
+			"Checked in",
+			`${lesson.sport} lesson — scanned in.`,
+			context.userId === coach ? "/app/coaches" : "/app/desk",
+		);
+	}
 	else if (data.status === "completed") {
 		const price = num(lesson.price_cents ?? 0);
 		const fee = num(lesson.facility_fee_cents ?? 0);
@@ -1769,6 +1827,13 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 			lessonTake = settled.take;
 		}
 		await sql`update lessons set rally_take_cents = ${(billing.plan === "monthly" ? 0 : lessonTake) + facilityTake} where id = ${data.id}`;
+		await notify(
+			sql,
+			context.userId === coach ? player : coach,
+			"Lesson complete",
+			"Pay on Cash App or Venmo — same handles as the coach desk Books.",
+			context.userId === coach ? "/app/coaches" : "/app/desk",
+		);
 	} else if (data.status === "cancelled") await notify(sql, context.userId === coach ? player : coach, "Lesson cancelled", "A lesson came off the board.", "/app/desk");
 	return { ok: true };
 });
@@ -2121,10 +2186,10 @@ export const homeFeed = createServerFn({ method: "GET" }).middleware([authMiddle
 	const pipeline = await sql`
       select
         (select count(*)::int from lessons
-          where coach_user_id = ${context.userId} and status = 'confirmed'
+          where coach_user_id = ${context.userId} and status in ('confirmed', 'checked_in')
             and starts_at >= now() and starts_at < now() + interval '7 days') as this_week,
         (select count(*)::int from lessons
-          where coach_user_id = ${context.userId} and status = 'confirmed'
+          where coach_user_id = ${context.userId} and status in ('confirmed', 'checked_in')
             and starts_at >= now() + interval '7 days' and starts_at < now() + interval '14 days') as next_week
     `;
 	return {

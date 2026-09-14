@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import { lessonIsOpen } from "@/lib/lesson-status";
-import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, Profile } from "@/lib/rally";
+import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -37,8 +37,10 @@ import {
   saveCoachBilling,
   saveCoachPayHandles,
   saveCoachProfile,
+  notifyRosterService,
   saveCoachService,
   saveProfile,
+  setCoachServiceVisibility,
   setLessonStatus,
 } from "@/lib/rally-server";
 
@@ -288,6 +290,7 @@ function Desk() {
           )}
           <ServicesPanel
             services={desk.data?.services ?? []}
+            roster={[...(desk.data?.roster ?? []), ...(desk.data?.credited ?? [])]}
             onChanged={refreshDesk}
           />
         </TabsContent>
@@ -475,12 +478,15 @@ function LogLessonForm({
 
 function ServicesPanel({
   services,
+  roster,
   onChanged,
 }: {
   services: CoachService[];
+  roster: PlayerProof[];
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const people = roster.filter((p, i, all) => all.findIndex((x) => x.user_id === p.user_id) === i);
   const save = useMutation({
     mutationFn: (data: Parameters<typeof saveCoachService>[0]["data"]) =>
       saveCoachService({ data }),
@@ -498,6 +504,21 @@ function ServicesPanel({
       onChanged();
     },
   });
+  const setVis = useMutation({
+    mutationFn: (data: { id: number; visibility: "public" | "player" }) =>
+      setCoachServiceVisibility({ data }),
+    onSuccess: () => {
+      toast.success("Visibility saved.");
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const tell = useMutation({
+    mutationFn: (data: { service_id: number; player_user_id: string }) =>
+      notifyRosterService({ data }),
+    onSuccess: () => toast.success("Player notified of that price."),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <Card className="mt-6">
@@ -505,7 +526,7 @@ function ServicesPanel({
         <div>
           <h2 className="font-display text-xl">Service menu</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Private hourly, group per person, hitting, juniors. Price is not one number.
+            Public rows show on Coaches. Player-only stays off that list — tell a roster player the price.
           </p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)}>
@@ -517,19 +538,65 @@ function ServicesPanel({
           <p className="text-sm text-muted-foreground">No services yet. Add the hours you actually sell.</p>
         ) : (
           services.map((s) => (
-            <li key={s.id} className="flex items-start justify-between gap-3 border-t border-border pt-2 first:border-0 first:pt-0">
-              <div>
-                <p className="text-sm">
-                  {s.name} · {priceLine(s)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {sportLabel(s.sport)} · {s.duration_min} min · {s.kind}
-                  {s.notes ? ` · ${s.notes}` : ""}
-                </p>
+            <li key={s.id} className="border-t border-border pt-2 first:border-0 first:pt-0">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm">
+                    {s.name} · {priceLine(s)}
+                    {s.visibility === "player" ? " · player-only" : " · public"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {sportLabel(s.sport)} · {s.duration_min} min · {s.kind}
+                    {s.notes ? ` · ${s.notes}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setVis.mutate({
+                        id: s.id,
+                        visibility: s.visibility === "player" ? "public" : "player",
+                      })
+                    }
+                  >
+                    {s.visibility === "player" ? "Make public" : "Make player-only"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove.mutate(s.id)}>
+                    Remove
+                  </Button>
+                </div>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => remove.mutate(s.id)}>
-                Remove
-              </Button>
+              {s.visibility === "player" ? (
+                <form
+                  className="mt-2 flex flex-wrap items-end gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const f = new FormData(e.currentTarget);
+                    const player = String(f.get("player_user_id") || "");
+                    if (!player) return;
+                    tell.mutate({ service_id: s.id, player_user_id: player });
+                  }}
+                >
+                  <Field label="Tell a roster player">
+                    <Select name="player_user_id" required defaultValue={people[0]?.user_id ?? ""}>
+                      {people.length === 0 ? (
+                        <option value="">No roster yet</option>
+                      ) : (
+                        people.map((p) => (
+                          <option key={p.user_id} value={p.user_id}>
+                            {p.display_name}
+                          </option>
+                        ))
+                      )}
+                    </Select>
+                  </Field>
+                  <Button size="sm" type="submit" disabled={tell.isPending || people.length === 0}>
+                    {tell.isPending ? "Sending…" : "Send price"}
+                  </Button>
+                </form>
+              ) : null}
             </li>
           ))
         )}
@@ -548,6 +615,7 @@ function ServicesPanel({
               unit: String(f.get("unit")) as "hour" | "person" | "session",
               duration_min: Number(f.get("duration_min")),
               notes: String(f.get("notes") || "") || undefined,
+              visibility: String(f.get("visibility")) === "player" ? "player" : "public",
             });
           }}
         >
@@ -588,6 +656,12 @@ function ServicesPanel({
               <Input name="duration_min" type="number" defaultValue={60} min={30} max={180} />
             </Field>
           </div>
+          <Field label="Who can see this price">
+            <Select name="visibility" defaultValue="public">
+              <option value="public">Public — on the coach list</option>
+              <option value="player">Player-only — roster notify</option>
+            </Select>
+          </Field>
           <Field label="Notes">
             <Input name="notes" placeholder="Vidalia Rec. We drill the miss." />
           </Field>

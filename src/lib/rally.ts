@@ -416,6 +416,7 @@ export type CoachService = {
   unit: string;
   duration_min: number;
   notes: string | null;
+  visibility: "public" | "player";
 };
 
 export type CoachCard = {

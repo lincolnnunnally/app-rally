@@ -463,6 +463,8 @@ export type LessonRow = {
   sport: string;
   status: string;
   notes: string | null;
+  has_video: boolean;
+  video_data?: string | null;
   price_cents: number | null;
   billing: string;
   group_spots: number | null;

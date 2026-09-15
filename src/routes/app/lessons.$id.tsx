@@ -2,11 +2,13 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { LessonNotesEditor, LessonNotesRead } from "@/components/lesson-notes";
+import { LessonVideoEditor, LessonVideoRead } from "@/components/lesson-video";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { lessonNotesEditable } from "@/lib/lesson-notes";
+import { lessonVideoEditable } from "@/lib/lesson-video";
 import { lessonIsOpen, lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, lessonWho, money, sportLabel } from "@/lib/rally";
 import { getLessonScan, setLessonStatus } from "@/lib/rally-server";
@@ -93,6 +95,19 @@ function LessonScan() {
           <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
         ) : (
           <LessonNotesRead notes={l.notes} />
+        )}
+      </Card>
+
+      <Card className="mt-6">
+        {lessonVideoEditable(l.status) ? (
+          <LessonVideoEditor
+            key={`${l.id}:${l.video_data ?? ""}`}
+            lessonId={l.id}
+            video={l.video_data ?? null}
+            hasVideo={l.has_video}
+          />
+        ) : (
+          <LessonVideoRead video={l.video_data ?? null} hasVideo={l.has_video} />
         )}
       </Card>
 

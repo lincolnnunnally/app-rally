@@ -6,6 +6,7 @@ import {
   lessonIsOpen,
   lessonScanPath,
   lessonStatusLabel,
+  noticeLessonId,
 } from "./lesson-status.ts";
 
 const coach = "coach-1";
@@ -15,6 +16,13 @@ const other = "stranger";
 describe("lessonScanPath", () => {
   it("points the existing QR primitive at a lesson", () => {
     assert.equal(lessonScanPath(42), "/app/lessons/42");
+  });
+});
+
+describe("noticeLessonId", () => {
+  it("keeps the student on the lesson door, not the coach catalog", () => {
+    assert.equal(noticeLessonId("/app/lessons/42"), "42");
+    assert.equal(noticeLessonId("/app/coaches"), null);
   });
 });
 

@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import { LessonNotesEditor } from "@/components/lesson-notes";
-import { LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
+import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
 import { lessonIsOpen } from "@/lib/lesson-status";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +82,16 @@ function Desk() {
   const requests = (desk.data?.lessons ?? []).filter((l) => l.status === "requested");
   const completed = (desk.data?.lessons ?? []).filter((l) => l.status === "completed");
   const pipeline = desk.data?.pipeline;
+  const logPeople = useMemo(() => {
+    const map = new Map<string, { user_id: string; display_name: string }>();
+    for (const p of directory.data ?? []) map.set(p.user_id, { user_id: p.user_id, display_name: p.display_name });
+    for (const r of desk.data?.roster ?? []) map.set(r.user_id, { user_id: r.user_id, display_name: r.display_name });
+    for (const l of desk.data?.lessons ?? []) {
+      map.set(l.player_user_id, { user_id: l.player_user_id, display_name: l.player_name });
+    }
+    return [...map.values()];
+  }, [directory.data, desk.data?.roster, desk.data?.lessons]);
+  const [logPlayerId, setLogPlayerId] = useState<string | undefined>();
 
   return (
     <div className="px-5 py-8">
@@ -126,10 +136,16 @@ function Desk() {
             <CoachInvite code={profile.share_code} coachName={profile.display_name} />
           </div>
           <LogLessonForm
+            key={`${logPlayerId ?? "auto"}:${upcoming.length === 0 ? "empty" : "has"}`}
             courts={courts}
-            people={directory.data ?? []}
+            people={logPeople}
             services={desk.data?.services ?? []}
-            onSaved={refreshDesk}
+            defaultOpen={desk.isSuccess && upcoming.length === 0}
+            defaultPlayerId={logPlayerId ?? completed[0]?.player_user_id}
+            onSaved={() => {
+              setLogPlayerId(undefined);
+              refreshDesk();
+            }}
           />
 
           <section className="mt-10">
@@ -175,7 +191,8 @@ function Desk() {
             <h2 className="font-display text-2xl">Upcoming</h2>
             {upcoming.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">
-                Nothing confirmed yet. Log a lesson or wait on a request.
+                Nothing confirmed yet. Log a lesson for a roster student — it lands confirmed here
+                with the same notes field. Or confirm a request.
               </p>
             ) : (
               <ul className="mt-3 flex flex-col gap-3">
@@ -268,6 +285,20 @@ function Desk() {
                       {lessonWho(l)} · {formatWall(l.starts_at)}
                       {l.service_name ? ` · ${l.service_name}` : ""}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
+                          Open lesson
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setLogPlayerId(l.player_user_id)}
+                      >
+                        Log another upcoming
+                      </Button>
+                    </div>
                     <div className="mt-3">
                       <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
                     </div>
@@ -353,15 +384,22 @@ function LogLessonForm({
   courts,
   people,
   services,
+  defaultOpen = false,
+  defaultPlayerId,
   onSaved,
 }: {
   courts: Court[];
   people: { user_id: string; display_name: string }[];
   services: CoachService[];
+  defaultOpen?: boolean;
+  defaultPlayerId?: string;
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [forKind, setForKind] = useState<"self" | "child">("self");
+  useEffect(() => {
+    if (defaultOpen || defaultPlayerId) setOpen(true);
+  }, [defaultOpen, defaultPlayerId]);
   const tennisCourt = courts.find(
     (c) => c.status === "open" && !c.is_other && c.sports.includes("tennis"),
   );
@@ -387,9 +425,14 @@ function LogLessonForm({
     <Card>
       <h2 className="font-display text-xl">Log a lesson</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        For students you already coach. Confirmed as soon as you save it. Recurring
-        weeks go on both calendars.
+        For students you already coach. Confirmed as soon as you save it — that is
+        Upcoming. Recurring weeks go on both calendars.
       </p>
+      {people.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          No roster or directory student yet. A completed lesson&apos;s player can be logged again.
+        </p>
+      ) : null}
       <form
         className="mt-4 grid gap-3"
         onSubmit={(e) => {
@@ -413,7 +456,7 @@ function LogLessonForm({
         }}
       >
         <Field label="Student (the parent if this is for a kid)">
-          <Select name="player_user_id" required>
+          <Select name="player_user_id" required defaultValue={defaultPlayerId ?? ""}>
             <option value="">Select</option>
             {people.map((p) => (
               <option key={p.user_id} value={p.user_id}>
@@ -464,7 +507,7 @@ function LogLessonForm({
           </Field>
         </div>
         <Field label="When">
-          <Input name="starts_at" type="datetime-local" required />
+          <Input name="starts_at" type="datetime-local" required defaultValue={defaultLessonWhen()} />
         </Field>
         <Field label="Court">
           <Select

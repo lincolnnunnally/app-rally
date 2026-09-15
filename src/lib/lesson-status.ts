@@ -19,6 +19,11 @@ export function lessonScanPath(id: number) {
   return `/app/lessons/${id}`;
 }
 
+export function noticeLessonId(href: string | null | undefined) {
+  const m = href?.match(/^\/app\/lessons\/(\d+)$/);
+  return m?.[1] ?? null;
+}
+
 export function canActorSetLessonStatus(opts: {
   actorId: string;
   coachId: string;

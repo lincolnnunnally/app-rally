@@ -89,6 +89,14 @@ function LessonScan() {
       </p>
 
       <Card className="mt-6">
+        {role === "coach" && lessonNotesEditable(l.status) ? (
+          <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
+        ) : (
+          <LessonNotesRead notes={l.notes} />
+        )}
+      </Card>
+
+      <Card className="mt-6">
         <p className="text-xs tracking-widest text-muted-foreground uppercase">Check in / check out</p>
         <p className="mt-2 text-sm text-muted-foreground">
           Scan updates this lesson on the existing status path. Check in when you arrive. Check out
@@ -120,14 +128,6 @@ function LessonScan() {
           <p className="mt-3 text-sm">This lesson is {lessonStatusLabel(l.status)}.</p>
         )}
         {role === "coach" ? <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} /> : null}
-      </Card>
-
-      <Card className="mt-6">
-        {role === "coach" && lessonNotesEditable(l.status) ? (
-          <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
-        ) : (
-          <LessonNotesRead notes={l.notes} />
-        )}
       </Card>
 
       <Card className="mt-6">

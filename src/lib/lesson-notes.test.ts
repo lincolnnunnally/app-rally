@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canActorSaveLessonNotes,
+  defaultLessonWhen,
   lessonNotesEditable,
   lessonNotesNotice,
 } from "./lesson-notes.ts";
@@ -56,10 +57,17 @@ describe("canActorSaveLessonNotes", () => {
 });
 
 describe("lessonNotesNotice", () => {
-  it("points the student at the existing coaches surface", () => {
-    const n = lessonNotesNotice("Third shot. Ten resets this week.");
+  it("points the student at the existing lesson scan door", () => {
+    const n = lessonNotesNotice("Third shot. Ten resets this week.", 42);
     assert.equal(n.title, "Practice cue");
     assert.match(n.body, /Third shot/);
-    assert.equal(n.href, "/app/coaches");
+    assert.equal(n.href, "/app/lessons/42");
+  });
+});
+
+describe("defaultLessonWhen", () => {
+  it("seeds the existing Log a lesson datetime one day out", () => {
+    const when = defaultLessonWhen(new Date("2026-09-15T14:20:00"));
+    assert.equal(when, "2026-09-16T14:00");
   });
 });

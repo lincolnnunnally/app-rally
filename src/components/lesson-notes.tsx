@@ -41,6 +41,7 @@ export function LessonNotesEditor({
       void qc.invalidateQueries({ queryKey: ["desk"] });
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["lesson-scan", lessonId] });
+      void qc.invalidateQueries({ queryKey: ["home"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
       onSaved?.();
     },

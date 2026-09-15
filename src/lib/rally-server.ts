@@ -1747,7 +1747,7 @@ export const saveLessonNotes = createServerFn({ method: "POST" }).middleware([au
 	if (!gate.ok) throw new Error(gate.error);
 	const notes = data.notes.trim() || null;
 	await sql`update lessons set notes = ${notes} where id = ${data.id}`;
-	const notice = lessonNotesNotice(notes);
+	const notice = lessonNotesNotice(notes, data.id);
 	await notify(sql, player, notice.title, notice.body, notice.href);
 	return { ok: true, notes };
 });

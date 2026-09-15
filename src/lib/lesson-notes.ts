@@ -4,6 +4,8 @@
  * product. Not skill badges.
  */
 
+import { lessonScanPath } from "./lesson-status.ts";
+
 export const LESSON_NOTES_MAX = 400;
 
 export const LESSON_NOTES_LABEL = "Session notes + weekly practice cue";
@@ -29,11 +31,20 @@ export function canActorSaveLessonNotes(opts: {
   return { ok: true };
 }
 
-export function lessonNotesNotice(notes: string | null) {
+export function lessonNotesNotice(notes: string | null, lessonId: number) {
   const cue = (notes ?? "").trim();
   return {
     title: "Practice cue",
     body: cue || "Your coach updated the weekly practice cue.",
-    href: "/app/coaches",
+    href: lessonScanPath(lessonId),
   };
+}
+
+/** Existing Log a lesson form — default wall-clock so Upcoming is seedable. */
+export function defaultLessonWhen(now = new Date()) {
+  const d = new Date(now.getTime());
+  d.setDate(d.getDate() + 1);
+  d.setMinutes(0, 0, 0);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`;
 }

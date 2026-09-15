@@ -2,17 +2,21 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { LessonNotesRead } from "@/components/lesson-notes";
+import { Badge } from "@/components/ui/badge";
 import { useRally } from "@/lib/rally-context";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, sportLabel } from "@/lib/rally";
-import { homeFeed } from "@/lib/rally-server";
+import { homeFeed, listMyLessons } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/app/")({ component: Today });
 
 function Today() {
   const { profile } = useRally();
   const feed = useQuery({ queryKey: ["home"], queryFn: () => homeFeed() });
+  const myLessons = useQuery({ queryKey: ["my-lessons"], queryFn: () => listMyLessons() });
 
   return (
     <div className="px-5 py-8">
@@ -41,6 +45,39 @@ function Today() {
             Open the coach desk
             <ArrowRight className="size-4" />
           </Link>
+        </Card>
+      ) : null}
+
+      {(myLessons.data ?? []).length > 0 ? (
+        <Card className="mt-8">
+          <p className="text-xs tracking-widest text-muted-foreground uppercase">Your lessons</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Session notes and the weekly practice cue — same field the coach writes on the desk.
+          </p>
+          <ul className="mt-4 flex flex-col gap-3">
+            {myLessons.data!.slice(0, 4).map((l) => (
+              <li key={l.id} className="border-t border-border pt-3 first:border-0 first:pt-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm">
+                    {l.coach_name} · {l.service_name ?? sportLabel(l.sport)}
+                  </span>
+                  <Badge>{lessonStatusLabel(l.status)}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{formatWall(l.starts_at)}</p>
+                <div className="mt-2">
+                  <LessonNotesRead notes={l.notes} />
+                </div>
+                <Link
+                  to="/app/lessons/$id"
+                  params={{ id: String(l.id) }}
+                  className="mt-2 flex items-center justify-between text-sm"
+                >
+                  Open lesson
+                  <ArrowRight className="size-4" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 

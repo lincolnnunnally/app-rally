@@ -73,6 +73,41 @@ function Coaches() {
         both calendars.
       </p>
 
+      {(lessons.data ?? []).length > 0 ? (
+        <div className="mt-8">
+          <h2 className="font-display text-2xl">Your lessons</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Session notes and the weekly practice cue from your coach. Same field as the desk.
+          </p>
+          <ul className="mt-4 flex flex-col gap-2">
+            {lessons.data!.map((l) => (
+              <li key={l.id} className="rounded-lg border border-border px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    {l.coach_name} · {l.service_name ?? sportLabel(l.sport)}
+                    {l.for_kind === "child" && l.for_name ? ` · for ${l.for_name}` : ""}
+                    {l.series_id ? " · recurring" : ""}
+                  </span>
+                  <Badge>{lessonStatusLabel(l.status)}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatWall(l.starts_at)} · {l.duration_min} min · {l.court_name ?? "Court TBD"}
+                  {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
+                </p>
+                <div className="mt-3">
+                  <LessonNotesRead notes={l.notes} />
+                </div>
+                <Button size="sm" variant="secondary" className="mt-3" asChild>
+                  <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
+                    Open lesson
+                  </Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mt-6 flex flex-wrap gap-2">
         {([
           ["all", "Everyone"],
@@ -105,38 +140,6 @@ function Coaches() {
           <CoachRow key={c.user_id} coach={c} mine={c.user_id === profile.user_id} courts={courts} />
         ))}
       </div>
-
-      {(lessons.data ?? []).length > 0 ? (
-        <div className="mt-10">
-          <h2 className="font-display text-2xl">Your lessons</h2>
-          <ul className="mt-4 flex flex-col gap-2">
-            {lessons.data!.map((l) => (
-              <li key={l.id} className="rounded-lg border border-border px-4 py-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span>
-                    {l.coach_name} · {l.service_name ?? sportLabel(l.sport)}
-                    {l.for_kind === "child" && l.for_name ? ` · for ${l.for_name}` : ""}
-                    {l.series_id ? " · recurring" : ""}
-                  </span>
-                  <Badge>{lessonStatusLabel(l.status)}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatWall(l.starts_at)} · {l.duration_min} min · {l.court_name ?? "Court TBD"}
-                  {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
-                </p>
-                <div className="mt-3">
-                  <LessonNotesRead notes={l.notes} />
-                </div>
-                <Button size="sm" variant="secondary" className="mt-3" asChild>
-                  <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
-                    Open lesson QR
-                  </Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import type {
   ReviewRow,
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
+import { canActorSaveLessonNotes, LESSON_NOTES_MAX, lessonNotesNotice } from "@/lib/lesson-notes";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
@@ -1629,7 +1630,7 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	starts_at: z.string().min(10),
 	duration_min: z.coerce.number().min(30).max(180),
 	court_id: z.coerce.number().optional(),
-	notes: z.string().max(400).optional(),
+	notes: z.string().max(LESSON_NOTES_MAX).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
 	for_kind: z.enum(["self", "child"]).optional(),
@@ -1677,7 +1678,7 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	starts_at: z.string().min(10),
 	duration_min: z.coerce.number().min(30).max(180),
 	court_id: z.coerce.number().optional(),
-	notes: z.string().max(400).optional(),
+	notes: z.string().max(LESSON_NOTES_MAX).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
 	group_spots: z.coerce.number().min(1).max(16).optional(),
@@ -1726,6 +1727,29 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 		"/app/coaches",
 	);
 	return { ok: true };
+});
+export const saveLessonNotes = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	notes: z.string().max(LESSON_NOTES_MAX)
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const lesson = (await sql`
+      select coach_user_id, player_user_id, status from lessons where id = ${data.id}
+    `)[0];
+	if (!lesson) throw new Error("Lesson not found");
+	const coach = String(lesson.coach_user_id);
+	const player = String(lesson.player_user_id);
+	const gate = canActorSaveLessonNotes({
+		actorId: context.userId,
+		coachId: coach,
+		status: String(lesson.status)
+	});
+	if (!gate.ok) throw new Error(gate.error);
+	const notes = data.notes.trim() || null;
+	await sql`update lessons set notes = ${notes} where id = ${data.id}`;
+	const notice = lessonNotesNotice(notes, data.id);
+	await notify(sql, player, notice.title, notice.body, notice.href);
+	return { ok: true, notes };
 });
 export const setLessonStatus = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number(),

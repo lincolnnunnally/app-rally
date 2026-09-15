@@ -1,10 +1,12 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { LessonNotesEditor, LessonNotesRead } from "@/components/lesson-notes";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { lessonNotesEditable } from "@/lib/lesson-notes";
 import { lessonIsOpen, lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, lessonWho, money, sportLabel } from "@/lib/rally";
 import { getLessonScan, setLessonStatus } from "@/lib/rally-server";
@@ -85,6 +87,14 @@ function LessonScan() {
         {l.court_name ? ` · ${l.court_name}` : ""}
         {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
       </p>
+
+      <Card className="mt-6">
+        {role === "coach" && lessonNotesEditable(l.status) ? (
+          <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
+        ) : (
+          <LessonNotesRead notes={l.notes} />
+        )}
+      </Card>
 
       <Card className="mt-6">
         <p className="text-xs tracking-widest text-muted-foreground uppercase">Check in / check out</p>

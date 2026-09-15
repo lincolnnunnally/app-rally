@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { RallyWordmark } from "@/components/brand";
 import { UserButton } from "@/lib/auth/gates";
+import { noticeLessonId } from "@/lib/lesson-status";
 import { listNotices, markNoticesRead } from "@/lib/rally-server";
 import { cn } from "@/lib/utils";
 
@@ -150,18 +151,33 @@ function NoticeBell() {
             <p className="mt-3 text-sm text-muted-foreground">Quiet. Lesson confirms and court holds land here.</p>
           ) : (
             <ul className="mt-3 flex max-h-80 flex-col gap-3 overflow-y-auto">
-              {(notices.data ?? []).map((n) => (
-                <li key={n.id} className="border-t border-border pt-3 first:border-0 first:pt-0">
-                  <Link
-                    to={asNoticeHref(n.href)}
-                    className="block"
-                    onClick={() => setOpen(false)}
-                  >
-                    <p className="text-sm">{n.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{n.body}</p>
-                  </Link>
-                </li>
-              ))}
+              {(notices.data ?? []).map((n) => {
+                const lessonId = noticeLessonId(n.href);
+                return (
+                  <li key={n.id} className="border-t border-border pt-3 first:border-0 first:pt-0">
+                    {lessonId ? (
+                      <Link
+                        to="/app/lessons/$id"
+                        params={{ id: lessonId }}
+                        className="block"
+                        onClick={() => setOpen(false)}
+                      >
+                        <p className="text-sm">{n.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{n.body}</p>
+                      </Link>
+                    ) : (
+                      <Link
+                        to={asNoticeHref(n.href)}
+                        className="block"
+                        onClick={() => setOpen(false)}
+                      >
+                        <p className="text-sm">{n.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{n.body}</p>
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

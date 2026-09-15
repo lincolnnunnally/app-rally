@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
+import { LessonNotesRead } from "@/components/lesson-notes";
 import { lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
@@ -123,6 +124,9 @@ function Coaches() {
                   {formatWall(l.starts_at)} · {l.duration_min} min · {l.court_name ?? "Court TBD"}
                   {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
                 </p>
+                <div className="mt-3">
+                  <LessonNotesRead notes={l.notes} />
+                </div>
                 <Button size="sm" variant="secondary" className="mt-3" asChild>
                   <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
                     Open lesson QR
@@ -339,6 +343,9 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
           <div className="flex flex-col gap-1.5">
             <Label>Notes</Label>
             <Textarea name="notes" placeholder="Working on the third shot. 3.5 doubles. I'm stalled." />
+            <p className="text-xs text-muted-foreground">
+              Same notes the coach edits as the session + weekly practice cue after they confirm.
+            </p>
           </div>
           <Button type="submit" disabled={book.isPending}>
             {book.isPending ? "Sending…" : "Send request"}

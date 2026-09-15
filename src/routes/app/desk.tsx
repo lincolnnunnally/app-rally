@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
+import { LessonNotesEditor } from "@/components/lesson-notes";
+import { LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
 import { lessonIsOpen } from "@/lib/lesson-status";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +80,7 @@ function Desk() {
 
   const upcoming = (desk.data?.lessons ?? []).filter((l) => lessonIsOpen(l.status));
   const requests = (desk.data?.lessons ?? []).filter((l) => l.status === "requested");
+  const completed = (desk.data?.lessons ?? []).filter((l) => l.status === "completed");
   const pipeline = desk.data?.pipeline;
 
   return (
@@ -215,6 +218,9 @@ function Desk() {
                     </div>
                     <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />
                     <div className="mt-4 border-t border-border pt-3">
+                      <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
+                    </div>
+                    <div className="mt-4 border-t border-border pt-3">
                       <p className="text-xs tracking-widest text-muted-foreground uppercase">
                         Pay now or charge at the end
                       </p>
@@ -246,6 +252,30 @@ function Desk() {
               />
             </Card>
           ) : null}
+
+          <section className="mt-10">
+            <h2 className="font-display text-2xl">Completed</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Same notes field as upcoming — session notes and the weekly practice cue.
+            </p>
+            {completed.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">No completed lessons yet.</p>
+            ) : (
+              <ul className="mt-3 flex flex-col gap-3">
+                {completed.map((l) => (
+                  <li key={l.id} className="rounded-lg border border-border px-4 py-3 text-sm">
+                    <p>
+                      {lessonWho(l)} · {formatWall(l.starts_at)}
+                      {l.service_name ? ` · ${l.service_name}` : ""}
+                    </p>
+                    <div className="mt-3">
+                      <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           <section className="mt-10">
             <h2 className="font-display text-2xl">Roster</h2>
@@ -460,8 +490,9 @@ function LogLessonForm({
         <Field label="Group spots (optional)">
           <Input name="group_spots" type="number" min={1} max={16} placeholder="Leave blank for private" />
         </Field>
-        <Field label="Notes">
-          <Textarea name="notes" placeholder="Third shot. Working on the reset." />
+        <Field label={LESSON_NOTES_LABEL}>
+          <Textarea name="notes" placeholder="Third shot. Ten resets this week before Thursday." />
+          <p className="text-xs text-muted-foreground">{LESSON_NOTES_HELP}</p>
         </Field>
         <div className="flex gap-2">
           <Button type="submit" disabled={save.isPending}>

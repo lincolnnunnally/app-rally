@@ -17,7 +17,8 @@ import type {
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
-import { RALLY, citySlug, money, parseCerts, parseHonors, slugify, takeCents } from "@/lib/rally";
+import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
+import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
 
 export type { ReviewRow };
 
@@ -830,7 +831,8 @@ function mapService(r: Record<string, unknown>): CoachService {
 		price_cents: num(r.price_cents),
 		unit: String(r.unit ?? "hour"),
 		duration_min: num(r.duration_min ?? 60),
-		notes: r.notes == null ? null : String(r.notes)
+		notes: r.notes == null ? null : String(r.notes),
+		visibility: String(r.visibility ?? "public") === "player" ? "player" : "public"
 	};
 }
 var profileInput = z.object({
@@ -1255,9 +1257,11 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	const services = await sql`select * from coach_services order by price_cents`;
 	const byCoach = /* @__PURE__ */ new Map();
 	for (const s of services) {
+		const mapped = mapService(s);
+		if (!serviceIsPublic(mapped.visibility)) continue;
 		const uid = String(s.coach_user_id);
 		const list = byCoach.get(uid) ?? [];
-		list.push(mapService(s));
+		list.push(mapped);
 		byCoach.set(uid, list);
 	}
 	const proofs = await sql`
@@ -1279,7 +1283,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	}
 	return rows.map((r) => {
 		const svc = byCoach.get(String(r.user_id)) ?? [];
-		const from = svc.length > 0 ? Math.min(...svc.map((s: CoachService) => s.price_cents)) : r.hourly_rate == null ? null : num(r.hourly_rate) * 100;
+		const from = publicFromCents(svc) ?? (r.hourly_rate == null ? null : num(r.hourly_rate) * 100);
 		return {
 			user_id: String(r.user_id),
 			display_name: String(r.display_name),
@@ -2373,6 +2377,15 @@ export const saveCourtPhoto = createServerFn({ method: "POST" }).middleware([aut
 	if (!rows[0]) throw new Error("That court is not on the public board.");
 	return mapCourt(rows[0]);
 });
+async function syncPublicHourly(sql: Sql, coachUserId: string) {
+	const cheapest = await sql`
+      select min(price_cents)::int as n from coach_services
+      where coach_user_id = ${coachUserId} and unit = 'hour' and visibility = 'public'
+    `;
+	if (cheapest[0]?.n != null) {
+		await sql`update coach_profiles set hourly_rate = ${Math.round(num(cheapest[0].n) / 100)} where user_id = ${coachUserId}`;
+	}
+}
 export const saveCoachService = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	name: z.string().trim().min(2).max(80),
 	kind: z.enum([
@@ -2389,7 +2402,8 @@ export const saveCoachService = createServerFn({ method: "POST" }).middleware([a
 		"session"
 	]),
 	duration_min: z.coerce.number().min(30).max(180),
-	notes: z.string().max(240).optional()
+	notes: z.string().max(240).optional(),
+	visibility: z.enum(["public", "player"]).optional()
 })).handler(async ({ context, data }) => {
 	const sql = await getSql();
 	await sql`
@@ -2397,21 +2411,71 @@ export const saveCoachService = createServerFn({ method: "POST" }).middleware([a
       on conflict do nothing
     `;
 	await sql`update profiles set is_coach = true where user_id = ${context.userId}`;
+	const visibility = data.visibility === "player" ? "player" : "public";
 	await sql`
-      insert into coach_services (coach_user_id, name, kind, sport, price_cents, unit, duration_min, notes)
+      insert into coach_services (coach_user_id, name, kind, sport, price_cents, unit, duration_min, notes, visibility)
       values (
         ${context.userId}, ${data.name}, ${data.kind}, ${data.sport},
-        ${Math.round(data.price * 100)}, ${data.unit}, ${data.duration_min}, ${data.notes ?? null}
+        ${Math.round(data.price * 100)}, ${data.unit}, ${data.duration_min}, ${data.notes ?? null},
+        ${visibility}
       )
     `;
-	const cheapest = await sql`
-      select min(price_cents)::int as n from coach_services where coach_user_id = ${context.userId} and unit = 'hour'
+	await syncPublicHourly(sql, context.userId);
+	return { ok: true };
+});
+export const setCoachServiceVisibility = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	visibility: z.enum(["public", "player"])
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const rows = await sql`
+      update coach_services set visibility = ${data.visibility}
+      where id = ${data.id} and coach_user_id = ${context.userId}
+      returning id
     `;
-	if (cheapest[0]?.n != null) await sql`update coach_profiles set hourly_rate = ${Math.round(num(cheapest[0].n) / 100)} where user_id = ${context.userId}`;
+	if (!rows[0]) throw new Error("Service not found");
+	await syncPublicHourly(sql, context.userId);
+	return { ok: true };
+});
+export const notifyRosterService = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	service_id: z.coerce.number(),
+	player_user_id: z.string().min(1)
+})).handler(async ({ context, data }) => {
+	if (data.player_user_id === context.userId) throw new Error("Pick a player on your roster.");
+	const sql = await getSql();
+	const service = (await sql`
+      select * from coach_services
+      where id = ${data.service_id} and coach_user_id = ${context.userId}
+      limit 1
+    `)[0];
+	if (!service) throw new Error("Service not found");
+	const mapped = mapService(service);
+	if (serviceIsPublic(mapped.visibility)) throw new Error("Only a player-only price can be sent this way.");
+	const onRoster = num((await sql`
+      select count(*)::int as n from lessons
+      where coach_user_id = ${context.userId} and player_user_id = ${data.player_user_id}
+        and status in ('confirmed', 'checked_in', 'completed')
+    `)[0]?.n ?? 0);
+	const credited = num((await sql`
+      select count(*)::int as n from profiles
+      where user_id = ${data.player_user_id} and credit_coach_user_id = ${context.userId} and onboarded = true
+    `)[0]?.n ?? 0);
+	if (onRoster === 0 && credited === 0) throw new Error("That player is not on your roster.");
+	const coach = (await sql`
+      select display_name from profiles where user_id = ${context.userId} limit 1
+    `)[0];
+	const notice = rosterServiceNotice({
+		coachName: coach?.display_name == null ? "Your coach" : String(coach.display_name),
+		serviceName: mapped.name,
+		priceLine: priceLine(mapped)
+	});
+	await notify(sql, data.player_user_id, notice.title, notice.body, notice.href);
 	return { ok: true };
 });
 export const deleteCoachService = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({ id: z.coerce.number() })).handler(async ({ context, data }) => {
-	await (await getSql())`delete from coach_services where id = ${data.id} and coach_user_id = ${context.userId}`;
+	const sql = await getSql();
+	await sql`delete from coach_services where id = ${data.id} and coach_user_id = ${context.userId}`;
+	await syncPublicHourly(sql, context.userId);
 	return { ok: true };
 });
 export const addLedgerEntry = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -2501,6 +2565,7 @@ export const catalogCity = createServerFn({ method: "GET" }).validator(z.object(
 	const services = await sql`
       select coach_user_id, min(price_cents)::int as from_cents
       from coach_services
+      where visibility = 'public'
       group by coach_user_id
     `;
 	const fromBy = new Map(services.map((s) => [String(s.coach_user_id), num(s.from_cents)]));

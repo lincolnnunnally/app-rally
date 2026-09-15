@@ -22,6 +22,7 @@ import { PlayerProofBlock } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
 import { LessonNotesRead } from "@/components/lesson-notes";
+import { LessonVideoRead } from "@/components/lesson-video";
 import { lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
@@ -78,6 +79,7 @@ function Coaches() {
           <h2 className="font-display text-2xl">Your lessons</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Session notes and the weekly practice cue from your coach. Same field as the desk.
+            Practice video lives on the same lesson.
           </p>
           <ul className="mt-4 flex flex-col gap-2">
             {lessons.data!.map((l) => (
@@ -96,6 +98,9 @@ function Coaches() {
                 </p>
                 <div className="mt-3">
                   <LessonNotesRead notes={l.notes} />
+                </div>
+                <div className="mt-3">
+                  <LessonVideoRead hasVideo={l.has_video} />
                 </div>
                 <Button size="sm" variant="secondary" className="mt-3" asChild>
                   <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>

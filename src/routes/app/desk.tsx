@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import { LessonNotesEditor } from "@/components/lesson-notes";
+import { LessonVideoEditor } from "@/components/lesson-video";
 import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
 import { lessonIsOpen } from "@/lib/lesson-status";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
@@ -234,8 +235,22 @@ function Desk() {
                       </div>
                     </div>
                     <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />
+                    <div className="mt-3">
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
+                          Open lesson
+                        </Link>
+                      </Button>
+                    </div>
                     <div className="mt-4 border-t border-border pt-3">
                       <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
+                    </div>
+                    <div className="mt-4 border-t border-border pt-3">
+                      <LessonVideoEditor
+                        key={`${l.id}:video`}
+                        lessonId={l.id}
+                        hasVideo={l.has_video}
+                      />
                     </div>
                     <div className="mt-4 border-t border-border pt-3">
                       <p className="text-xs tracking-widest text-muted-foreground uppercase">
@@ -273,7 +288,8 @@ function Desk() {
           <section className="mt-10">
             <h2 className="font-display text-2xl">Completed</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Same notes field as upcoming — session notes and the weekly practice cue.
+              Same notes field as upcoming — session notes and the weekly practice cue. Practice
+              video sits on this lesson next to it.
             </p>
             {completed.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No completed lessons yet.</p>
@@ -301,6 +317,13 @@ function Desk() {
                     </div>
                     <div className="mt-3">
                       <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
+                    </div>
+                    <div className="mt-4 border-t border-border pt-3">
+                      <LessonVideoEditor
+                        key={`${l.id}:video`}
+                        lessonId={l.id}
+                        hasVideo={l.has_video}
+                      />
                     </div>
                   </li>
                 ))}

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { LessonNotesRead } from "@/components/lesson-notes";
+import { LessonVideoRead } from "@/components/lesson-video";
 import { Badge } from "@/components/ui/badge";
 import { useRally } from "@/lib/rally-context";
 import { Card } from "@/components/ui/card";
@@ -53,6 +54,7 @@ function Today() {
           <p className="text-xs tracking-widest text-muted-foreground uppercase">Your lessons</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Session notes and the weekly practice cue — same field the coach writes on the desk.
+            Practice video lives on the same lesson.
           </p>
           <ul className="mt-4 flex flex-col gap-3">
             {myLessons.data!.slice(0, 4).map((l) => (
@@ -66,6 +68,9 @@ function Today() {
                 <p className="mt-1 text-xs text-muted-foreground">{formatWall(l.starts_at)}</p>
                 <div className="mt-2">
                   <LessonNotesRead notes={l.notes} />
+                </div>
+                <div className="mt-2">
+                  <LessonVideoRead hasVideo={l.has_video} />
                 </div>
                 <Link
                   to="/app/lessons/$id"

@@ -17,6 +17,12 @@ import type {
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
 import { canActorSaveLessonNotes, LESSON_NOTES_MAX, lessonNotesNotice } from "@/lib/lesson-notes";
+import {
+  assertLessonVideoPayload,
+  canActorSaveLessonVideo,
+  LESSON_VIDEO_MAX,
+  lessonVideoNotice,
+} from "@/lib/lesson-video";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
@@ -1530,6 +1536,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
                l.for_kind, l.for_name,
+               (l.video_data is not null and length(l.video_data) > 20) as has_video,
                c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
                sv.name as service_name
         from lessons l
@@ -1545,6 +1552,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
                l.for_kind, l.for_name,
+               (l.video_data is not null and length(l.video_data) > 20) as has_video,
                c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
                sv.name as service_name
         from lessons l
@@ -1572,6 +1580,8 @@ function mapLesson(r: Record<string, unknown>): LessonRow {
 		sport: String(r.sport),
 		status: String(r.status),
 		notes: r.notes == null ? null : String(r.notes),
+		has_video: bool(r.has_video) || (r.video_data != null && String(r.video_data).length > 20),
+		video_data: r.video_data == null || String(r.video_data) === "" ? null : String(r.video_data),
 		price_cents: r.price_cents == null ? null : num(r.price_cents),
 		billing: String(r.billing ?? "hour"),
 		group_spots: r.group_spots == null ? null : num(r.group_spots),
@@ -1596,6 +1606,8 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
              l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
              l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
              l.for_kind, l.for_name,
+             (l.video_data is not null and length(l.video_data) > 20) as has_video,
+             l.video_data,
              c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
              sv.name as service_name,
              cp.cash_app_handle, cp.venmo_handle
@@ -1750,6 +1762,47 @@ export const saveLessonNotes = createServerFn({ method: "POST" }).middleware([au
 	const notice = lessonNotesNotice(notes, data.id);
 	await notify(sql, player, notice.title, notice.body, notice.href);
 	return { ok: true, notes };
+});
+export const getLessonVideo = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number()
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const row = (await sql`
+      select coach_user_id, player_user_id, video_data from lessons where id = ${data.id} limit 1
+    `)[0];
+	if (!row) throw new Error("Lesson not found");
+	if (context.userId !== String(row.coach_user_id) && context.userId !== String(row.player_user_id)) {
+		throw new Error("This lesson is not yours.");
+	}
+	const video = row.video_data == null || String(row.video_data) === "" ? null : String(row.video_data);
+	return { video_data: video };
+});
+export const saveLessonVideo = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	video_data: z.string().max(LESSON_VIDEO_MAX)
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const lesson = (await sql`
+      select coach_user_id, player_user_id, status from lessons where id = ${data.id}
+    `)[0];
+	if (!lesson) throw new Error("Lesson not found");
+	const coach = String(lesson.coach_user_id);
+	const player = String(lesson.player_user_id);
+	const gate = canActorSaveLessonVideo({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		status: String(lesson.status)
+	});
+	if (!gate.ok) throw new Error(gate.error);
+	const video = assertLessonVideoPayload(data.video_data);
+	await sql`update lessons set video_data = ${video} where id = ${data.id}`;
+	if (video) {
+		const other = context.userId === coach ? player : coach;
+		const notice = lessonVideoNotice(data.id);
+		await notify(sql, other, notice.title, notice.body, notice.href);
+	}
+	return { ok: true, has_video: video != null };
 });
 export const setLessonStatus = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number(),

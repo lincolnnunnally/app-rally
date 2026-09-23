@@ -17,6 +17,7 @@ import type {
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
 import { canActorSaveLessonNotes, LESSON_NOTES_MAX, lessonNotesNotice } from "@/lib/lesson-notes";
+import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
@@ -2161,7 +2162,7 @@ export const addJournal = createServerFn({ method: "POST" }).middleware([authMid
 		"reset"
 	]),
 	title: z.string().max(80).optional(),
-	body: z.string().trim().min(1).max(2e3)
+	body: z.string().trim().min(1).max(SESSION_BODY_MAX)
 })).handler(async ({ context, data }) => {
 	await (await getSql())`
       insert into journal_entries (user_id, kind, title, body)

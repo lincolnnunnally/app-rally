@@ -7,6 +7,7 @@ import { LessonNotesEditor } from "@/components/lesson-notes";
 import { LessonVideoEditor } from "@/components/lesson-video";
 import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
 import { lessonIsOpen } from "@/lib/lesson-status";
+import { withCoachAsPlayer } from "@/lib/lesson-video";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,7 @@ function Desk() {
     void qc.invalidateQueries({ queryKey: ["bootstrap"] });
     void qc.invalidateQueries({ queryKey: ["coaches"] });
     void qc.invalidateQueries({ queryKey: ["home"] });
+    void qc.invalidateQueries({ queryKey: ["my-lessons"] });
     void qc.invalidateQueries({ queryKey: ["notices"] });
   };
 
@@ -90,8 +92,11 @@ function Desk() {
     for (const l of desk.data?.lessons ?? []) {
       map.set(l.player_user_id, { user_id: l.player_user_id, display_name: l.player_name });
     }
-    return [...map.values()];
-  }, [directory.data, desk.data?.roster, desk.data?.lessons]);
+    return withCoachAsPlayer(
+      { user_id: profile.user_id, display_name: profile.display_name },
+      [...map.values()],
+    );
+  }, [directory.data, desk.data?.roster, desk.data?.lessons, profile.display_name, profile.user_id]);
   const [logPlayerId, setLogPlayerId] = useState<string | undefined>();
 
   return (
@@ -448,8 +453,9 @@ function LogLessonForm({
     <Card>
       <h2 className="font-display text-xl">Log a lesson</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        For students you already coach. Confirmed as soon as you save it — that is
-        Upcoming. Recurring weeks go on both calendars.
+        For students you already coach. You are a player too — select yourself and
+        this lesson also lands on Today and Your lessons. Confirmed as soon as you
+        save it. Recurring weeks go on both calendars.
       </p>
       {people.length === 0 ? (
         <p className="mt-2 text-sm text-muted-foreground">

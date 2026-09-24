@@ -61,8 +61,9 @@ function LessonScan() {
     return <div className="px-5 py-8 text-sm text-muted-foreground">Loading lesson…</div>;
   }
 
-  const { lesson: l, role, cash_app_handle, venmo_handle } = scan.data;
+  const { lesson: l, role, player_video, cash_app_handle, venmo_handle } = scan.data;
   const open = lessonIsOpen(l.status);
+  const canEditVideo = player_video || (role === "coach" && lessonVideoEditable(l.status));
 
   return (
     <div className="px-5 py-8">
@@ -99,7 +100,7 @@ function LessonScan() {
       </Card>
 
       <Card className="mt-6">
-        {lessonVideoEditable(l.status) ? (
+        {canEditVideo ? (
           <LessonVideoEditor
             key={`${l.id}:${l.video_data ?? ""}`}
             lessonId={l.id}

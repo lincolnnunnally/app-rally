@@ -6,6 +6,9 @@ import {
   isLessonVideoData,
   lessonVideoEditable,
   lessonVideoNotice,
+  lessonVideoNoticeTarget,
+  showsPlayerLessonVideo,
+  withCoachAsPlayer,
   LESSON_VIDEO_MAX,
 } from "./lesson-video.ts";
 
@@ -63,6 +66,40 @@ describe("canActorSaveLessonVideo", () => {
       status: "requested",
     });
     assert.equal(denied.ok, false);
+  });
+
+  it("lets one account be the coach and the player on that lesson", () => {
+    assert.equal(
+      canActorSaveLessonVideo({
+        actorId: coach,
+        coachId: coach,
+        playerId: coach,
+        status: "confirmed",
+      }).ok,
+      true,
+    );
+    assert.equal(
+      showsPlayerLessonVideo({ actorId: coach, playerId: coach, status: "completed" }),
+      true,
+    );
+    assert.equal(
+      showsPlayerLessonVideo({ actorId: coach, playerId: player, status: "completed" }),
+      false,
+    );
+    assert.equal(lessonVideoNoticeTarget(coach, coach, coach), null);
+    assert.equal(lessonVideoNoticeTarget(coach, coach, player), player);
+    assert.equal(lessonVideoNoticeTarget(player, coach, player), coach);
+    const people = withCoachAsPlayer(
+      { user_id: coach, display_name: "Coach Video" },
+      [
+        { user_id: player, display_name: "Student" },
+        { user_id: coach, display_name: "Coach Video" },
+      ],
+    );
+    assert.deepEqual(people, [
+      { user_id: coach, display_name: "Coach Video (you)" },
+      { user_id: player, display_name: "Student" },
+    ]);
   });
 });
 

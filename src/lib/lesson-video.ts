@@ -41,6 +41,34 @@ export function canActorSaveLessonVideo(opts: {
   return { ok: true };
 }
 
+/**
+ * Player play/replace stays on the lesson when this account is the student,
+ * including when that same account is also the coach.
+ */
+export function showsPlayerLessonVideo(opts: {
+  actorId: string;
+  playerId: string;
+  status: string;
+}) {
+  return opts.actorId === opts.playerId && lessonVideoEditable(opts.status);
+}
+
+/** Coach log list leads with this account. Coaches are players on the same lesson. */
+export function withCoachAsPlayer<T extends { user_id: string; display_name: string }>(
+  self: { user_id: string; display_name: string },
+  others: T[],
+) {
+  const rest = others.filter((p) => p.user_id !== self.user_id);
+  return [{ user_id: self.user_id, display_name: `${self.display_name} (you)` }, ...rest];
+}
+
+/** Notice goes to the other person on the lesson. Same account is both — no second party. */
+export function lessonVideoNoticeTarget(actorId: string, coachId: string, playerId: string) {
+  const other = actorId === coachId ? playerId : coachId;
+  if (!other || other === actorId) return null;
+  return other;
+}
+
 export function lessonVideoNotice(lessonId: number) {
   return {
     title: "Practice video",

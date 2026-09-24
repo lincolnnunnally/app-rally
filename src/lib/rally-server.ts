@@ -22,6 +22,8 @@ import {
   canActorSaveLessonVideo,
   LESSON_VIDEO_MAX,
   lessonVideoNotice,
+  lessonVideoNoticeTarget,
+  showsPlayerLessonVideo,
 } from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
@@ -1629,6 +1631,11 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
 	return {
 		lesson,
 		role: context.userId === lesson.coach_user_id ? "coach" as const : "player" as const,
+		player_video: showsPlayerLessonVideo({
+			actorId: context.userId,
+			playerId: lesson.player_user_id,
+			status: lesson.status
+		}),
 		cash_app_handle: row.cash_app_handle == null || String(row.cash_app_handle).trim() === ""
 			? null
 			: String(row.cash_app_handle),
@@ -1698,7 +1705,7 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	for_kind: z.enum(["self", "child"]).optional(),
 	for_name: z.string().trim().max(80).optional()
 })).handler(async ({ context, data }) => {
-	if (data.player_user_id === context.userId) throw new Error("Pick a student.");
+	// Coaches are players. This account may be the student on the lesson it logs.
 	const sql = await getSql();
 	await sql`update profiles set is_coach = true, updated_at = now() where user_id = ${context.userId}`;
 	await sql`
@@ -1799,9 +1806,11 @@ export const saveLessonVideo = createServerFn({ method: "POST" }).middleware([au
 	const video = assertLessonVideoPayload(data.video_data);
 	await sql`update lessons set video_data = ${video} where id = ${data.id}`;
 	if (video) {
-		const other = context.userId === coach ? player : coach;
-		const notice = lessonVideoNotice(data.id);
-		await notify(sql, other, notice.title, notice.body, notice.href);
+		const other = lessonVideoNoticeTarget(context.userId, coach, player);
+		if (other) {
+			const notice = lessonVideoNotice(data.id);
+			await notify(sql, other, notice.title, notice.body, notice.href);
+		}
 	}
 	return { ok: true, has_video: video != null };
 });

@@ -35,6 +35,22 @@ function Today() {
         {profile.city}
       </p>
 
+      <Card className="mt-8">
+        <p className="text-xs tracking-widest text-muted-foreground uppercase">Journal</p>
+        <p className="mt-2 font-display text-xl">After court</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          After play or a lesson, name one thing that worked. The rest can wait.
+        </p>
+        <Link
+          to="/app/mental"
+          search={{ after: "court" }}
+          className="mt-3 flex items-center justify-between text-sm"
+        >
+          After court
+          <ArrowRight className="size-4" />
+        </Link>
+      </Card>
+
       {profile.is_coach ? (
         <Card className="mt-8">
           <p className="text-xs tracking-widest text-muted-foreground uppercase">Coach</p>
@@ -130,7 +146,8 @@ function Today() {
               <p className="text-xs tracking-widest text-muted-foreground uppercase">Needs you</p>
               {feed.data.pendingLessons > 0 ? (
                 <Link to="/app/desk" className="flex items-center justify-between text-sm">
-                  {feed.data.pendingLessons} lesson request{feed.data.pendingLessons === 1 ? "" : "s"}
+                  {feed.data.pendingLessons} lesson request
+                  {feed.data.pendingLessons === 1 ? "" : "s"}
                   <ArrowRight className="size-4" />
                 </Link>
               ) : null}

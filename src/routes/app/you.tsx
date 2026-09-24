@@ -1,5 +1,13 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Brain, GraduationCap, TrendingDown, Trophy, UserRound, Users } from "lucide-react";
+import {
+  Brain,
+  GraduationCap,
+  PenLine,
+  TrendingDown,
+  Trophy,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PlayerSportCards } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
@@ -42,6 +50,17 @@ function You() {
         <ShareRally code={profile.share_code} creditCents={profile.credit_cents} />
       </div>
       <div className="mt-8 grid gap-3">
+        <Link to="/app/mental" search={{ after: "court" }}>
+          <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">
+            <PenLine className="size-5 text-primary" />
+            <div>
+              <div className="font-medium">After court</div>
+              <div className="text-sm text-muted-foreground">
+                After play or a lesson, start with what you did well.
+              </div>
+            </div>
+          </Card>
+        </Link>
         {LINKS.map((l) => (
           <Link key={l.to} to={l.to}>
             <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">

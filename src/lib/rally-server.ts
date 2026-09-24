@@ -23,6 +23,7 @@ import {
   LESSON_VIDEO_MAX,
   lessonVideoNotice,
 } from "@/lib/lesson-video";
+import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
@@ -2214,7 +2215,7 @@ export const addJournal = createServerFn({ method: "POST" }).middleware([authMid
 		"reset"
 	]),
 	title: z.string().max(80).optional(),
-	body: z.string().trim().min(1).max(2e3)
+	body: z.string().trim().min(1).max(SESSION_BODY_MAX)
 })).handler(async ({ context, data }) => {
 	await (await getSql())`
       insert into journal_entries (user_id, kind, title, body)

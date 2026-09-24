@@ -1,40 +1,75 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { SessionJournalPanel } from "@/components/session-journal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { MENTAL_RESET, SELF_TALK, VISUALIZATIONS, formatWall } from "@/lib/rally";
+import { MENTAL_RESET, SELF_TALK, VISUALIZATIONS } from "@/lib/rally";
 import { addJournal, listJournal } from "@/lib/rally-server";
 
-export const Route = createFileRoute("/app/mental")({ component: Mental });
+export const Route = createFileRoute("/app/mental")({
+  validateSearch: (s: Record<string, unknown>): { after?: "court" } =>
+    s.after === "court" ? { after: "court" } : {},
+  component: Mental,
+});
 
 function Mental() {
+  const { after } = Route.useSearch();
   const qc = useQueryClient();
   const entries = useQuery({ queryKey: ["journal"], queryFn: () => listJournal() });
+  const [savedSession, setSavedSession] = useState(false);
   const add = useMutation({
     mutationFn: (data: Parameters<typeof addJournal>[0]["data"]) => addJournal({ data }),
-    onSuccess: () => {
-      toast.success("Logged.");
+    onSuccess: (_result, vars) => {
+      if (vars.kind === "journal") setSavedSession(true);
+      else toast.success("Logged.");
       void qc.invalidateQueries({ queryKey: ["journal"] });
+    },
+    onError: (_err, vars) => {
+      if (vars.kind === "journal") {
+        toast("Could not save that yet. Your words are still here.");
+      }
     },
   });
   const [step, setStep] = useState(0);
-  const [journal, setJournal] = useState("");
+  const [tab, setTab] = useState(after === "court" ? "journal" : "reset");
   const [swap, setSwap] = useState("");
+
+  useEffect(() => {
+    if (after === "court") setTab("journal");
+  }, [after]);
+
+  function openAfterCourt() {
+    setTab("journal");
+    setSavedSession(false);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("after-court")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   return (
     <div className="px-5 py-8">
       <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Mental</p>
       <h1 className="mt-2 font-display text-4xl">Between the points</h1>
       <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-        The Rec crowd is loud. This is the quiet work — the same four steps, every
-        time, until they are automatic.
+        The Rec crowd is loud. This is the quiet work — the same four steps, every time, until they
+        are automatic.
       </p>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={openAfterCourt}>
+          After court
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          After play or a lesson. Start with what went well.
+        </p>
+      </div>
 
-      <Tabs defaultValue="reset" className="mt-8">
+      <Tabs value={tab} onValueChange={setTab} className="mt-8">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="reset">Reset</TabsTrigger>
           <TabsTrigger value="talk">Self-talk</TabsTrigger>
@@ -137,37 +172,14 @@ function Mental() {
           </div>
         </TabsContent>
 
-        <TabsContent value="journal" className="mt-6">
-          <Card>
-            <h2 className="font-display text-xl">After the session</h2>
-            <Textarea
-              className="mt-3"
-              value={journal}
-              onChange={(e) => setJournal(e.target.value)}
-              placeholder="What broke down at 10–8. What I will do the next time the ball sits up."
-            />
-            <Button
-              className="mt-3"
-              disabled={!journal.trim()}
-              onClick={() => {
-                add.mutate({ kind: "journal", title: "Session", body: journal });
-                setJournal("");
-              }}
-            >
-              Save
-            </Button>
-          </Card>
-          <ul className="mt-4 flex flex-col gap-2">
-            {(entries.data ?? []).map((e) => (
-              <li key={e.id} className="rounded-lg border border-border px-4 py-3">
-                <p className="text-xs text-muted-foreground">
-                  {e.kind} · {formatWall(e.created_at)}
-                </p>
-                {e.title ? <p className="mt-1 text-sm font-medium">{e.title}</p> : null}
-                <p className="mt-1 text-sm leading-relaxed">{e.body}</p>
-              </li>
-            ))}
-          </ul>
+        <TabsContent value="journal" forceMount className="mt-6 data-[state=inactive]:hidden">
+          <SessionJournalPanel
+            entries={entries.data ?? []}
+            pending={add.isPending}
+            saved={savedSession}
+            onWriteAnother={() => setSavedSession(false)}
+            onSave={(data) => add.mutate({ kind: "journal", ...data })}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -17,6 +17,17 @@ import type {
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
 import { canActorSaveLessonNotes, LESSON_NOTES_MAX, lessonNotesNotice } from "@/lib/lesson-notes";
+import {
+  assertLessonVideoChoice,
+  canActorOwnLessonVideoPath,
+  canActorSaveLessonVideo,
+  LESSON_VIDEO_ERRORS,
+  lessonVideoNotice,
+  lessonVideoNoticeTarget,
+  lessonVideoObjectPath,
+  lessonVideoPlaybackSrc,
+  showsPlayerLessonVideo,
+} from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
@@ -1531,6 +1542,10 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
                l.for_kind, l.for_name,
+               (
+                 (l.video_path is not null and length(l.video_path) > 0)
+                 or (l.video_data is not null and length(l.video_data) > 20)
+               ) as has_video,
                c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
                sv.name as service_name
         from lessons l
@@ -1546,6 +1561,10 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
                l.for_kind, l.for_name,
+               (
+                 (l.video_path is not null and length(l.video_path) > 0)
+                 or (l.video_data is not null and length(l.video_data) > 20)
+               ) as has_video,
                c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
                sv.name as service_name
         from lessons l
@@ -1573,6 +1592,10 @@ function mapLesson(r: Record<string, unknown>): LessonRow {
 		sport: String(r.sport),
 		status: String(r.status),
 		notes: r.notes == null ? null : String(r.notes),
+		has_video: bool(r.has_video)
+			|| (r.video_path != null && String(r.video_path).length > 0)
+			|| (r.video_data != null && String(r.video_data).length > 20),
+		video_data: r.video_data == null || String(r.video_data) === "" ? null : String(r.video_data),
 		price_cents: r.price_cents == null ? null : num(r.price_cents),
 		billing: String(r.billing ?? "hour"),
 		group_spots: r.group_spots == null ? null : num(r.group_spots),
@@ -1597,6 +1620,10 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
              l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
              l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
              l.for_kind, l.for_name,
+             (
+               (l.video_path is not null and length(l.video_path) > 0)
+               or (l.video_data is not null and length(l.video_data) > 20)
+             ) as has_video,
              c.name as court_name, pc.display_name as coach_name, pp.display_name as player_name,
              sv.name as service_name,
              cp.cash_app_handle, cp.venmo_handle
@@ -1617,6 +1644,11 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
 	return {
 		lesson,
 		role: context.userId === lesson.coach_user_id ? "coach" as const : "player" as const,
+		player_video: showsPlayerLessonVideo({
+			actorId: context.userId,
+			playerId: lesson.player_user_id,
+			status: lesson.status
+		}),
 		cash_app_handle: row.cash_app_handle == null || String(row.cash_app_handle).trim() === ""
 			? null
 			: String(row.cash_app_handle),
@@ -1686,7 +1718,7 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	for_kind: z.enum(["self", "child"]).optional(),
 	for_name: z.string().trim().max(80).optional()
 })).handler(async ({ context, data }) => {
-	if (data.player_user_id === context.userId) throw new Error("Pick a student.");
+	// Coaches are players. This account may be the student on the lesson it logs.
 	const sql = await getSql();
 	await sql`update profiles set is_coach = true, updated_at = now() where user_id = ${context.userId}`;
 	await sql`
@@ -1751,6 +1783,163 @@ export const saveLessonNotes = createServerFn({ method: "POST" }).middleware([au
 	const notice = lessonNotesNotice(notes, data.id);
 	await notify(sql, player, notice.title, notice.body, notice.href);
 	return { ok: true, notes };
+});
+async function lessonVideoRow(sql: Sql, id: number) {
+	const lesson = (await sql`
+      select coach_user_id, player_user_id, status, video_data, video_path
+      from lessons where id = ${id} limit 1
+    `)[0];
+	if (!lesson) throw new Error("Lesson not found");
+	return lesson;
+}
+
+function lessonVideoLegacy(videoData: unknown) {
+	return videoData == null || String(videoData) === "" ? null : String(videoData);
+}
+
+export const getLessonVideoSetup = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async () => {
+	const { lessonVideoStorageConfigured } = await import("@/lib/lesson-video-storage.server");
+	return { ready: lessonVideoStorageConfigured() };
+});
+
+export const getLessonVideo = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number()
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const row = await lessonVideoRow(sql, data.id);
+	const coach = String(row.coach_user_id);
+	const player = String(row.player_user_id);
+	if (context.userId !== coach && context.userId !== player) {
+		throw new Error("This lesson is not yours.");
+	}
+	const path = row.video_path == null || String(row.video_path) === "" ? null : String(row.video_path);
+	const legacy = lessonVideoLegacy(row.video_data);
+	let signed: string | null = null;
+	const ownsPath = path != null && canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: path
+	});
+	if (ownsPath && path) {
+		const { lessonVideoStorageConfigured, signLessonVideoPlayback } = await import("@/lib/lesson-video-storage.server");
+		if (lessonVideoStorageConfigured()) {
+			try {
+				signed = await signLessonVideoPlayback(path);
+			} catch {
+				signed = null;
+			}
+		}
+	}
+	return { src: lessonVideoPlaybackSrc(legacy, signed) };
+});
+export const prepareLessonVideoUpload = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	content_type: z.string().max(80),
+	byte_size: z.number().int().positive(),
+	duration_sec: z.number().positive()
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const lesson = await lessonVideoRow(sql, data.id);
+	const coach = String(lesson.coach_user_id);
+	const player = String(lesson.player_user_id);
+	const gate = canActorSaveLessonVideo({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		status: String(lesson.status)
+	});
+	if (!gate.ok) throw new Error(gate.error);
+	const choice = assertLessonVideoChoice({
+		contentType: data.content_type,
+		fileName: "",
+		byteSize: data.byte_size,
+		durationSec: data.duration_sec
+	});
+	const path = lessonVideoObjectPath(data.id, crypto.randomUUID(), choice.extension);
+	if (!canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: path
+	})) {
+		throw new Error("This lesson is not yours.");
+	}
+	const { createLessonVideoUpload, lessonVideoStorageConfigured } = await import("@/lib/lesson-video-storage.server");
+	if (!lessonVideoStorageConfigured()) throw new Error(LESSON_VIDEO_ERRORS.notSetUp);
+	const upload = await createLessonVideoUpload(path);
+	if (!canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: upload.path
+	})) {
+		throw new Error("This lesson is not yours.");
+	}
+	return { path: upload.path, signedUrl: upload.signedUrl };
+});
+export const commitLessonVideo = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	video_path: z.string().min(1).max(180)
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const lesson = await lessonVideoRow(sql, data.id);
+	const coach = String(lesson.coach_user_id);
+	const player = String(lesson.player_user_id);
+	const gate = canActorSaveLessonVideo({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		status: String(lesson.status)
+	});
+	if (!gate.ok) throw new Error(gate.error);
+	if (!canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: data.video_path
+	})) {
+		throw new Error("This lesson is not yours.");
+	}
+	const { lessonVideoObjectExists, signLessonVideoPlayback, deleteLessonVideoObject } = await import("@/lib/lesson-video-storage.server");
+	if (!await lessonVideoObjectExists(data.video_path)) {
+		throw new Error("Could not upload that clip. Try again.");
+	}
+	const previous = lesson.video_path == null || String(lesson.video_path) === "" ? null : String(lesson.video_path);
+	await sql`update lessons set video_path = ${data.video_path}, video_data = null where id = ${data.id}`;
+	if (previous && previous !== data.video_path) await deleteLessonVideoObject(previous);
+	const other = lessonVideoNoticeTarget(context.userId, coach, player);
+	if (other) {
+		const notice = lessonVideoNotice(data.id);
+		await notify(sql, other, notice.title, notice.body, notice.href);
+	}
+	return { ok: true, has_video: true, src: await signLessonVideoPlayback(data.video_path) };
+});
+export const removeLessonVideo = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number()
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const lesson = await lessonVideoRow(sql, data.id);
+	const coach = String(lesson.coach_user_id);
+	const player = String(lesson.player_user_id);
+	const gate = canActorSaveLessonVideo({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		status: String(lesson.status)
+	});
+	if (!gate.ok) throw new Error(gate.error);
+	const previous = lesson.video_path == null || String(lesson.video_path) === "" ? null : String(lesson.video_path);
+	await sql`update lessons set video_path = null, video_data = null where id = ${data.id}`;
+	if (previous) {
+		const { deleteLessonVideoObject } = await import("@/lib/lesson-video-storage.server");
+		await deleteLessonVideoObject(previous);
+	}
+	return { ok: true, has_video: false, src: null };
 });
 export const setLessonStatus = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number(),

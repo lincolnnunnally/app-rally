@@ -56,6 +56,21 @@ test("non-.sql entries are dropped (readdir also yields the auth/ directory)", (
   assert.deepEqual(pendingMigrations(["auth", "README.md"], []), []);
 });
 
+test("0014_lesson_video_path.sql is in the deploy migrator set", () => {
+  // scripts/migrate.mjs readdir's migrations/ (not supabase/migrations/) and
+  // pendingMigrations applies every unapplied .sql against DATABASE_URL.
+  const migrationsDir = join(projectRoot(), "migrations");
+  const names = readdirSync(migrationsDir);
+  assert.ok(names.includes("0014_lesson_video_path.sql"));
+  const pending = pendingMigrations(names, names.filter((name) => name !== "0014_lesson_video_path.sql"));
+  assert.deepEqual(pending, [{ name: "0014_lesson_video_path.sql", path: "0014_lesson_video_path.sql" }]);
+  const storageDir = join(projectRoot(), "supabase", "migrations");
+  assert.equal(
+    pendingMigrations(readdirSync(storageDir), []).some((file) => file.name === "0014_lesson_video_path.sql"),
+    false,
+  );
+});
+
 test("the auth schema ships outside the globbed directory", () => {
   const migrationsDir = join(projectRoot(), "migrations");
   assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), []), []);

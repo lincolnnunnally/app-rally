@@ -10,6 +10,8 @@ import {
   lessonVideoNotice,
   lessonVideoNoticeTarget,
   lessonVideoObjectPath,
+  lessonVideoPlaybackSrc,
+  lessonVideoUiMessage,
   showsPlayerLessonVideo,
   withCoachAsPlayer,
   LESSON_VIDEO_ERRORS,
@@ -182,6 +184,34 @@ describe("assertLessonVideoChoice", () => {
     assert.equal(isLessonVideoData("data:video/webm;base64,AAAA"), true);
     assert.equal(isLessonVideoData(null), false);
   });
+
+  it("plays an old data-URI clip when storage is not signed", () => {
+    const legacy = "data:video/mp4;base64,AAAA";
+    assert.equal(lessonVideoPlaybackSrc(legacy, null), legacy);
+    assert.equal(lessonVideoPlaybackSrc(legacy, undefined), legacy);
+    assert.equal(
+      lessonVideoPlaybackSrc(legacy, "https://uqhqulrqcygsmmzdzemx.supabase.co/storage/v1/object/sign/rally-lesson-videos/7/a.mp4"),
+      "https://uqhqulrqcygsmmzdzemx.supabase.co/storage/v1/object/sign/rally-lesson-videos/7/a.mp4",
+    );
+  });
+});
+
+describe("lessonVideoUiMessage", () => {
+  it("says video upload is not set up instead of a raw storage error", () => {
+    assert.equal(
+      lessonVideoUiMessage(new Error("Lesson video storage is not configured.")),
+      LESSON_VIDEO_ERRORS.notSetUp,
+    );
+    assert.equal(
+      lessonVideoUiMessage(new Error("Missing SUPABASE_SERVICE_ROLE_KEY")),
+      LESSON_VIDEO_ERRORS.notSetUp,
+    );
+    assert.equal(lessonVideoUiMessage(new Error(LESSON_VIDEO_ERRORS.notSetUp)), LESSON_VIDEO_ERRORS.notSetUp);
+    assert.equal(
+      lessonVideoUiMessage(new Error("Error: boom\n    at signLessonVideoPlayback")),
+      LESSON_VIDEO_ERRORS.upload,
+    );
+  });
 });
 
 describe("lesson video object path", () => {
@@ -192,6 +222,41 @@ describe("lesson video object path", () => {
     assert.equal(isLessonVideoObjectPath(8, path), false);
     assert.equal(isLessonVideoObjectPath(7, `7/../8/${clip}.mp4`), false);
     assert.equal(isLessonVideoObjectPath(7, `7/${clip}.jpg`), false);
+  });
+
+  it("forbids signing an upload or playback url for a stranger or another lesson", () => {
+    const objectPath = lessonVideoObjectPath(7, clip, "mp4");
+    assert.equal(objectPath.startsWith("7/"), true);
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: other,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath,
+      }),
+      false,
+    );
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: coach,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath: "8/11111111-1111-4111-8111-111111111111.mp4",
+      }),
+      false,
+    );
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: player,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath: "not-a-lesson/clip.mp4",
+      }),
+      false,
+    );
   });
 
   it("lets the coach or the student own the path, not a stranger", () => {

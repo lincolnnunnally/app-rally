@@ -8,10 +8,17 @@ import {
   LESSON_VIDEO_ERRORS,
   LESSON_VIDEO_HELP,
   LESSON_VIDEO_LABEL,
+  lessonVideoUiMessage,
   readLessonVideoDuration,
   uploadLessonVideoFile,
 } from "@/lib/lesson-video";
-import { commitLessonVideo, getLessonVideo, prepareLessonVideoUpload, removeLessonVideo } from "@/lib/rally-server";
+import {
+  commitLessonVideo,
+  getLessonVideo,
+  getLessonVideoSetup,
+  prepareLessonVideoUpload,
+  removeLessonVideo,
+} from "@/lib/rally-server";
 
 function LessonVideoPlayer({ video }: { video: string }) {
   return (
@@ -78,6 +85,12 @@ export function LessonVideoEditor({
 }) {
   const qc = useQueryClient();
   const { shown, setLocal } = useLessonVideoSrc(lessonId, video, hasVideo);
+  const setup = useQuery({
+    queryKey: ["lesson-video-setup"],
+    queryFn: () => getLessonVideoSetup(),
+  });
+  const [uploadBlocked, setUploadBlocked] = useState(false);
+  const notSetUp = uploadBlocked || setup.data?.ready === false;
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["desk"] });
@@ -109,7 +122,7 @@ export function LessonVideoEditor({
       try {
         await uploadLessonVideoFile(prepared.signedUrl, file);
       } catch (err) {
-        throw err instanceof Error ? err : new Error(LESSON_VIDEO_ERRORS.upload);
+        throw new Error(lessonVideoUiMessage(err));
       }
       return commitLessonVideo({ data: { id: lessonId, video_path: prepared.path } });
     },
@@ -118,7 +131,11 @@ export function LessonVideoEditor({
       toast.success("Practice video saved on this lesson.");
       refresh();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      const message = lessonVideoUiMessage(e);
+      if (message === LESSON_VIDEO_ERRORS.notSetUp) setUploadBlocked(true);
+      toast.error(message);
+    },
   });
 
   const remove = useMutation({
@@ -128,7 +145,7 @@ export function LessonVideoEditor({
       toast.success("Practice video removed.");
       refresh();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(lessonVideoUiMessage(e)),
   });
 
   const busy = save.isPending || remove.isPending;
@@ -139,21 +156,25 @@ export function LessonVideoEditor({
       <p className="text-xs tracking-widest text-muted-foreground uppercase">{LESSON_VIDEO_LABEL}</p>
       <p className="text-xs text-muted-foreground">{LESSON_VIDEO_HELP}</p>
       {playable ? <LessonVideoPlayer video={shown!} /> : null}
-      <label className="text-sm font-medium">
-        {playable ? "Replace clip" : "Upload clip"}
-        <input
-          type="file"
-          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-          className="mt-1 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground"
-          disabled={busy}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file) return;
-            save.mutate(file);
-          }}
-        />
-      </label>
+      {notSetUp ? (
+        <p className="text-sm text-muted-foreground">{LESSON_VIDEO_ERRORS.notSetUp}</p>
+      ) : (
+        <label className="text-sm font-medium">
+          {playable ? "Replace clip" : "Upload clip"}
+          <input
+            type="file"
+            accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+            className="mt-1 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground"
+            disabled={busy || setup.isPending}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              save.mutate(file);
+            }}
+          />
+        </label>
+      )}
       {playable ? (
         <div>
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => remove.mutate()}>

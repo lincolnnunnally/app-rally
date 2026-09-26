@@ -37,7 +37,10 @@ export const LESSON_VIDEO_ERRORS = {
   tooBig: "That clip is over 50 MB.",
   upload: "Could not upload that clip. Try again.",
   read: "Could not read that video.",
+  notSetUp: "Video upload isn't set up yet",
 } as const;
+
+const LESSON_VIDEO_KNOWN_ERRORS = new Set<string>(Object.values(LESSON_VIDEO_ERRORS));
 
 const MIME_EXT = {
   "video/mp4": "mp4",
@@ -57,6 +60,31 @@ export function isLessonVideoData(value: string | null | undefined) {
 
 export function isLessonVideoSrc(value: string | null | undefined) {
   return isLessonVideoData(value) || Boolean(value && value.startsWith("https://"));
+}
+
+/** Signed URL when storage is up. Otherwise the old data-URI clip, if there is one. */
+export function lessonVideoPlaybackSrc(
+  videoData: string | null | undefined,
+  signedUrl: string | null | undefined,
+) {
+  if (signedUrl && signedUrl.startsWith("https://")) return signedUrl;
+  return isLessonVideoData(videoData) ? videoData : null;
+}
+
+/**
+ * Message for the upload UI. A missing service-role key, or a raw client/storage
+ * failure, never surfaces as a stack or an env name.
+ */
+export function lessonVideoUiMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (LESSON_VIDEO_KNOWN_ERRORS.has(message)) return message;
+  if (/isn.t set up|not configured|supabase_service_role|service[_ ]role/i.test(message)) {
+    return LESSON_VIDEO_ERRORS.notSetUp;
+  }
+  if (message && !message.includes("\n") && message.length < 180 && !/\bat\s+\S+/.test(message)) {
+    return message;
+  }
+  return LESSON_VIDEO_ERRORS.upload;
 }
 
 export function canActorSaveLessonVideo(opts: {

@@ -21,10 +21,11 @@ import {
   assertLessonVideoChoice,
   canActorOwnLessonVideoPath,
   canActorSaveLessonVideo,
-  isLessonVideoData,
+  LESSON_VIDEO_ERRORS,
   lessonVideoNotice,
   lessonVideoNoticeTarget,
   lessonVideoObjectPath,
+  lessonVideoPlaybackSrc,
   showsPlayerLessonVideo,
 } from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
@@ -1792,11 +1793,14 @@ async function lessonVideoRow(sql: Sql, id: number) {
 	return lesson;
 }
 
-function lessonVideoPlayback(videoData: unknown, signedUrl: string | null) {
-	if (signedUrl) return signedUrl;
-	const legacy = videoData == null || String(videoData) === "" ? null : String(videoData);
-	return isLessonVideoData(legacy) ? legacy : null;
+function lessonVideoLegacy(videoData: unknown) {
+	return videoData == null || String(videoData) === "" ? null : String(videoData);
 }
+
+export const getLessonVideoSetup = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async () => {
+	const { lessonVideoStorageConfigured } = await import("@/lib/lesson-video-storage.server");
+	return { ready: lessonVideoStorageConfigured() };
+});
 
 export const getLessonVideo = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number()
@@ -1809,12 +1813,26 @@ export const getLessonVideo = createServerFn({ method: "GET" }).middleware([auth
 		throw new Error("This lesson is not yours.");
 	}
 	const path = row.video_path == null || String(row.video_path) === "" ? null : String(row.video_path);
+	const legacy = lessonVideoLegacy(row.video_data);
 	let signed: string | null = null;
-	if (path) {
-		const { signLessonVideoPlayback } = await import("@/lib/lesson-video-storage.server");
-		signed = await signLessonVideoPlayback(path);
+	const ownsPath = path != null && canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: path
+	});
+	if (ownsPath && path) {
+		const { lessonVideoStorageConfigured, signLessonVideoPlayback } = await import("@/lib/lesson-video-storage.server");
+		if (lessonVideoStorageConfigured()) {
+			try {
+				signed = await signLessonVideoPlayback(path);
+			} catch {
+				signed = null;
+			}
+		}
 	}
-	return { src: lessonVideoPlayback(row.video_data, signed) };
+	return { src: lessonVideoPlaybackSrc(legacy, signed) };
 });
 export const prepareLessonVideoUpload = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number(),
@@ -1840,9 +1858,28 @@ export const prepareLessonVideoUpload = createServerFn({ method: "POST" }).middl
 		durationSec: data.duration_sec
 	});
 	const path = lessonVideoObjectPath(data.id, crypto.randomUUID(), choice.extension);
-	const { createLessonVideoUpload } = await import("@/lib/lesson-video-storage.server");
+	if (!canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: path
+	})) {
+		throw new Error("This lesson is not yours.");
+	}
+	const { createLessonVideoUpload, lessonVideoStorageConfigured } = await import("@/lib/lesson-video-storage.server");
+	if (!lessonVideoStorageConfigured()) throw new Error(LESSON_VIDEO_ERRORS.notSetUp);
 	const upload = await createLessonVideoUpload(path);
-	return { path, signedUrl: upload.signedUrl };
+	if (!canActorOwnLessonVideoPath({
+		actorId: context.userId,
+		coachId: coach,
+		playerId: player,
+		lessonId: data.id,
+		objectPath: upload.path
+	})) {
+		throw new Error("This lesson is not yours.");
+	}
+	return { path: upload.path, signedUrl: upload.signedUrl };
 });
 export const commitLessonVideo = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number(),

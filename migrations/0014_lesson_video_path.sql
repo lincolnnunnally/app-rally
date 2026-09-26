@@ -1,7 +1,9 @@
 -- Path of a practice clip in the private rally-lesson-videos bucket.
--- Bucket, 50 MB limit, mime types, and storage.objects policies are in
--- supabase/migrations/20260926140900_rally_lesson_videos.sql (apply on LPL by hand).
--- This column is what list/scan queries read. Old clips stay in video_data.
+-- Applied on deploy by scripts/migrate.mjs (`npm run build` → db:migrate)
+-- against Rally's DATABASE_URL (search_path rally, public). Not the LPL
+-- storage project. The bucket itself is supabase/migrations/
+-- 20260926140900_rally_lesson_videos.sql, applied on LPL by hand.
+-- Old clips stay in video_data.
 
 alter table lessons
   add column if not exists video_path text;

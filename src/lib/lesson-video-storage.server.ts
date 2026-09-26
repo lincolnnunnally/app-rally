@@ -12,9 +12,13 @@ import {
   LESSON_VIDEO_STORAGE_URL,
 } from "./lesson-video.ts";
 
+export function lessonVideoStorageConfigured() {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+}
+
 function admin(): SupabaseClient {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!key) throw new Error("Lesson video storage is not configured.");
+  if (!key) throw new Error(LESSON_VIDEO_ERRORS.notSetUp);
   const url = process.env.SUPABASE_URL?.trim() || LESSON_VIDEO_STORAGE_URL;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -23,7 +27,9 @@ function admin(): SupabaseClient {
 
 function asUploadError(error: { message?: string } | null): Error {
   const message = error?.message ?? "";
-  if (/not configured/i.test(message)) return new Error("Lesson video storage is not configured.");
+  if (message === LESSON_VIDEO_ERRORS.notSetUp || /isn.t set up|not configured|service[_ ]role/i.test(message)) {
+    return new Error(LESSON_VIDEO_ERRORS.notSetUp);
+  }
   return new Error(LESSON_VIDEO_ERRORS.upload);
 }
 

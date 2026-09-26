@@ -4,7 +4,9 @@ import { RallyMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authErrorMessage } from "@/lib/auth/auth-error";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } from "@/lib/auth/client";
+import { rallyResetRedirect } from "@/lib/auth/reset-redirect";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { consumeAppNext, rememberCoach, rememberRef } from "@/lib/rally";
 
@@ -49,14 +51,18 @@ function Login() {
           name: name || email.split("@")[0],
           callbackURL: dest,
         });
-        if (res.error) throw new Error(res.error.message || "Could not create account");
+        if (res.error) {
+          throw new Error(authErrorMessage(res.error, "Could not create account"));
+        }
       } else {
         const res = await authClient.signIn.email({
           email,
           password,
           callbackURL: dest,
         });
-        if (res.error) throw new Error(res.error.message || "Could not sign in");
+        if (res.error) {
+          throw new Error(authErrorMessage(res.error, "Could not sign in"));
+        }
       }
       window.location.assign(dest);
     } catch (err) {
@@ -94,7 +100,7 @@ function Login() {
       }
       const res = await requestReset({
         email: trimmed,
-        redirectTo: "/reset-password",
+        redirectTo: rallyResetRedirect(window.location.origin),
       });
       if (res.error) {
         setError(

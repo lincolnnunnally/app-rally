@@ -30,12 +30,14 @@ export type AuthErrorLike = {
   message?: string | null;
   code?: string | null;
   statusText?: string | null;
+  /** Nested body, e.g. a gateway `{ error: { message, code } }` spread onto the client error. */
+  error?: { message?: string | null; code?: string | null } | null;
 };
 
 export function authErrorMessage(error: AuthErrorLike | null | undefined, fallback: string): string {
-  const message = specific(error?.message);
+  const message = specific(error?.message) ?? specific(error?.error?.message);
   if (message) return message;
-  const code = error?.code?.trim();
+  const code = error?.code?.trim() || error?.error?.code?.trim() || "";
   if (code && CODE_MESSAGES[code]) return CODE_MESSAGES[code];
   const statusText = specific(error?.statusText);
   if (statusText) return statusText;

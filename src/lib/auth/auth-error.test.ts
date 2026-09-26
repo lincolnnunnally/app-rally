@@ -35,4 +35,14 @@ describe("authErrorMessage", () => {
     assert.equal(authErrorMessage(null, "Could not sign in"), "Could not sign in");
     assert.equal(authErrorMessage({ message: "Unauthorized" }, "Could not sign in"), "Could not sign in");
   });
+
+  it("unwraps a nested server message", () => {
+    assert.equal(
+      authErrorMessage(
+        { statusText: "Unauthorized", error: { message: "Protected deployment", code: "401" } },
+        "Could not sign in",
+      ),
+      "Protected deployment",
+    );
+  });
 });

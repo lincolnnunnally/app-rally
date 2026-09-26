@@ -25,6 +25,8 @@ function PaymentReturn() {
     queryKey: ["connect-status"],
     queryFn: () => getConnectStatus(),
     enabled: connect === "1",
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   return (

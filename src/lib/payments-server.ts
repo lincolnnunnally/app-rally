@@ -29,6 +29,7 @@ import {
   releaseExpiredLessonFees,
   subtractLessonPlatformFee,
 } from "@/lib/platform-fee-reserve";
+import { webhookHandles, webhookSecrets, type WebhookSource } from "@/lib/stripe-webhook";
 
 const CHECKOUT_TTL_MS = 35 * 60 * 1000;
 const OWNER_DEFAULT = ["lincoln@unitedundergod.org"];
@@ -108,7 +109,7 @@ async function writeAccount(sql: Sql, account: StripeAccount) {
 }
 
 async function syncConnectAccount(userId: string) {
-  if (!paymentsConfigured()) return;
+  if (!env("STRIPE_SECRET_KEY")) return;
   const sql = await getSql();
   const rows = await sql`select stripe_account_id from connect_accounts where user_id = ${userId} limit 1`;
   const id = rows[0]?.stripe_account_id ? String(rows[0].stripe_account_id) : null;
@@ -117,6 +118,15 @@ async function syncConnectAccount(userId: string) {
   if (!stripe) return;
   const account = await stripe.accounts.retrieve(id);
   await writeAccount(sql, account);
+}
+
+/** Retrieve the connected account and store charges_enabled / payouts_enabled. */
+export async function refreshConnectAccount(userId: string) {
+  try {
+    await syncConnectAccount(userId);
+  } catch (err) {
+    console.error("[stripe] account sync", err instanceof Error ? err.message : "failed");
+  }
 }
 
 async function ensureConnectAccount(userId: string): Promise<string> {
@@ -639,9 +649,45 @@ export async function abandonOpenPayment(
   }
 }
 
+async function applyCheckoutExpired(session: CheckoutSession) {
+  const paymentId = session.metadata?.payment_id ? num(session.metadata.payment_id) : 0;
+  await withTransaction(async (sql) => {
+    const peek = await sql<{ id: number | string }>`
+      select id from payments
+      where stripe_checkout_session_id = ${session.id}
+         or (${paymentId} > 0 and id = ${paymentId})
+      limit 1
+    `;
+    if (!peek[0]) return;
+    await expirePayment(sql, num(peek[0].id));
+  });
+}
+
+async function recordStripeEvent(id: string, type: string) {
+  await (await getSql())`
+    insert into stripe_events (id, type) values (${id}, ${type})
+    on conflict do nothing
+  `;
+}
+
+function verifyWebhook(
+  stripe: StripeClient,
+  payload: string,
+  signature: string,
+): { event: import("stripe").Stripe.Event; source: WebhookSource } | null {
+  for (const item of webhookSecrets(process.env)) {
+    try {
+      return { event: stripe.webhooks.constructEvent(payload, signature, item.secret), source: item.source };
+    } catch {
+      // This secret did not sign the payload. Try the other endpoint.
+    }
+  }
+  return null;
+}
+
 export async function handleStripeWebhook(request: Request): Promise<Response> {
-  const secret = env("STRIPE_WEBHOOK_SECRET");
-  if (!secret || !env("STRIPE_SECRET_KEY")) {
+  const secrets = webhookSecrets(process.env);
+  if (!env("STRIPE_SECRET_KEY") || secrets.length === 0) {
     return new Response("Payments coming soon", { status: 503 });
   }
   const stripe = await stripeClient();
@@ -649,26 +695,24 @@ export async function handleStripeWebhook(request: Request): Promise<Response> {
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature");
   if (!signature) return new Response("Missing signature", { status: 400 });
-  let event: import("stripe").Stripe.Event;
+  const verified = verifyWebhook(stripe, payload, signature);
+  if (!verified) return new Response("Invalid signature", { status: 400 });
+  const { event, source } = verified;
   try {
-    event = stripe.webhooks.constructEvent(payload, signature, secret);
-  } catch {
-    return new Response("Invalid signature", { status: 400 });
-  }
-  try {
-    if (event.type === "checkout.session.completed") {
-      await applyCheckoutSession(event.data.object as CheckoutSession);
-    } else if (event.type === "account.updated") {
-      const account = event.data.object as StripeAccount;
-      const full = await stripe.accounts.retrieve(account.id);
-      await writeAccount(await getSql(), full);
-    } else if (event.type === "charge.refunded") {
-      await applyChargeRefunded(event.data.object as StripeCharge);
+    if (webhookHandles(source, event.type)) {
+      if (event.type === "checkout.session.completed") {
+        await applyCheckoutSession(event.data.object as CheckoutSession);
+      } else if (event.type === "checkout.session.expired") {
+        await applyCheckoutExpired(event.data.object as CheckoutSession);
+      } else if (event.type === "account.updated") {
+        const account = event.data.object as StripeAccount;
+        const full = await stripe.accounts.retrieve(account.id);
+        await writeAccount(await getSql(), full);
+      } else if (event.type === "charge.refunded") {
+        await applyChargeRefunded(event.data.object as StripeCharge);
+      }
     }
-    await (await getSql())`
-      insert into stripe_events (id, type) values (${event.id}, ${event.type})
-      on conflict do nothing
-    `;
+    await recordStripeEvent(event.id, event.type);
   } catch (err) {
     console.error("[stripe] webhook", event.type, err instanceof Error ? err.message : "failed");
     return new Response("Webhook failed", { status: 500 });
@@ -741,11 +785,7 @@ export const getConnectStatus = createServerFn({ method: "GET" })
       leaguePct: config.leaguePct,
     };
     if (!base.enabled) return base;
-    try {
-      await syncConnectAccount(context.userId);
-    } catch (err) {
-      console.error("[stripe] account sync", err instanceof Error ? err.message : "failed");
-    }
+    await refreshConnectAccount(context.userId);
     const rows = await (await getSql())`
       select transfers_active, charges_enabled, payouts_enabled, details_submitted
       from connect_accounts where user_id = ${context.userId} limit 1
@@ -768,6 +808,7 @@ export const startConnectOnboarding = createServerFn({ method: "POST" })
     const stripe = await stripeClient();
     if (!stripe) throw new Error("Payments coming soon");
     const accountId = await ensureConnectAccount(context.userId);
+    await refreshConnectAccount(context.userId);
     const origin = publicOrigin();
     const link = await stripe.accountLinks.create({
       account: accountId,

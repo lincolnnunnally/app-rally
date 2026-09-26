@@ -15,7 +15,12 @@ import {
 } from "@/lib/payments-server";
 
 export function PayoutSetupCard() {
-  const status = useQuery({ queryKey: ["connect-status"], queryFn: () => getConnectStatus() });
+  const status = useQuery({
+    queryKey: ["connect-status"],
+    queryFn: () => getConnectStatus(),
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
   const start = useMutation({
     mutationFn: () => startConnectOnboarding(),
     onSuccess: (res) => {

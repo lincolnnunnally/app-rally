@@ -21,7 +21,7 @@ import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
-import { abandonOpenPayment, payeeCanReceive, paymentsConfigured } from "@/lib/payments-server";
+import { abandonOpenPayment, payeeCanReceive, paymentsConfigured, refreshConnectAccount } from "@/lib/payments-server";
 
 export type { ReviewRow };
 
@@ -1338,6 +1338,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	});
 });
 export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
+	await refreshConnectAccount(context.userId);
 	const sql = await getSql();
 	await ensureSeed(sql);
 	const coach = await sql`

@@ -34,9 +34,12 @@ import { Route as AppYouRouteImport } from './routes/app/you'
 import { Route as WhereIndexRouteImport } from './routes/where.index'
 import { Route as WhereCityRouteImport } from './routes/where.$city'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 import { Route as AppLeaguesIndexRouteImport } from './routes/app/leagues.index'
 import { Route as AppLeaguesIdRouteImport } from './routes/app/leagues.$id'
 import { Route as AppLessonsIdRouteImport } from './routes/app/lessons.$id'
+import { Route as AppPaymentsRefreshRouteImport } from './routes/app/payments/refresh'
+import { Route as AppPaymentsReturnRouteImport } from './routes/app/payments/return'
 import { Route as WhereCityIndexRouteImport } from './routes/where.$city.index'
 import { Route as WhereCitySlugRouteImport } from './routes/where.$city.$slug'
 
@@ -165,6 +168,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe/webhook',
+  path: '/api/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppLeaguesIndexRoute = AppLeaguesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -178,6 +186,16 @@ const AppLeaguesIdRoute = AppLeaguesIdRouteImport.update({
 const AppLessonsIdRoute = AppLessonsIdRouteImport.update({
   id: '/lessons/$id',
   path: '/lessons/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPaymentsRefreshRoute = AppPaymentsRefreshRouteImport.update({
+  id: '/payments/refresh',
+  path: '/payments/refresh',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPaymentsReturnRoute = AppPaymentsReturnRouteImport.update({
+  id: '/payments/return',
+  path: '/payments/return',
   getParentRoute: () => AppRoute,
 } as any)
 const WhereCityIndexRoute = WhereCityIndexRouteImport.update({
@@ -217,8 +235,11 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
+  '/app/payments/refresh': typeof AppPaymentsRefreshRoute
+  '/app/payments/return': typeof AppPaymentsReturnRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues/': typeof AppLeaguesIndexRoute
   '/where/$city/': typeof WhereCityIndexRoute
@@ -245,8 +266,11 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/where': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
+  '/app/payments/refresh': typeof AppPaymentsRefreshRoute
+  '/app/payments/return': typeof AppPaymentsReturnRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues': typeof AppLeaguesIndexRoute
   '/where/$city': typeof WhereCityIndexRoute
@@ -278,8 +302,11 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
+  '/app/payments/refresh': typeof AppPaymentsRefreshRoute
+  '/app/payments/return': typeof AppPaymentsReturnRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues/': typeof AppLeaguesIndexRoute
   '/where/$city/': typeof WhereCityIndexRoute
@@ -312,8 +339,11 @@ export interface FileRouteTypes {
     | '/app/'
     | '/where/'
     | '/api/auth/$'
+    | '/api/stripe/webhook'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
+    | '/app/payments/refresh'
+    | '/app/payments/return'
     | '/where/$city/$slug'
     | '/app/leagues/'
     | '/where/$city/'
@@ -340,8 +370,11 @@ export interface FileRouteTypes {
     | '/app'
     | '/where'
     | '/api/auth/$'
+    | '/api/stripe/webhook'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
+    | '/app/payments/refresh'
+    | '/app/payments/return'
     | '/where/$city/$slug'
     | '/app/leagues'
     | '/where/$city'
@@ -372,8 +405,11 @@ export interface FileRouteTypes {
     | '/app/'
     | '/where/'
     | '/api/auth/$'
+    | '/api/stripe/webhook'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
+    | '/app/payments/refresh'
+    | '/app/payments/return'
     | '/where/$city/$slug'
     | '/app/leagues/'
     | '/where/$city/'
@@ -392,6 +428,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   WhereRoute: typeof WhereRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -571,6 +608,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stripe/webhook': {
+      id: '/api/stripe/webhook'
+      path: '/api/stripe/webhook'
+      fullPath: '/api/stripe/webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/leagues/': {
       id: '/app/leagues/'
       path: '/'
@@ -590,6 +634,20 @@ declare module '@tanstack/react-router' {
       path: '/lessons/$id'
       fullPath: '/app/lessons/$id'
       preLoaderRoute: typeof AppLessonsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/payments/refresh': {
+      id: '/app/payments/refresh'
+      path: '/payments/refresh'
+      fullPath: '/app/payments/refresh'
+      preLoaderRoute: typeof AppPaymentsRefreshRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/payments/return': {
+      id: '/app/payments/return'
+      path: '/payments/return'
+      fullPath: '/app/payments/return'
+      preLoaderRoute: typeof AppPaymentsReturnRouteImport
       parentRoute: typeof AppRoute
     }
     '/where/$city/': {
@@ -636,6 +694,8 @@ interface AppRouteChildren {
   AppYouRoute: typeof AppYouRoute
   AppIndexRoute: typeof AppIndexRoute
   AppLessonsIdRoute: typeof AppLessonsIdRoute
+  AppPaymentsRefreshRoute: typeof AppPaymentsRefreshRoute
+  AppPaymentsReturnRoute: typeof AppPaymentsReturnRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -651,6 +711,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppYouRoute: AppYouRoute,
   AppIndexRoute: AppIndexRoute,
   AppLessonsIdRoute: AppLessonsIdRoute,
+  AppPaymentsRefreshRoute: AppPaymentsRefreshRoute,
+  AppPaymentsReturnRoute: AppPaymentsReturnRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -694,6 +756,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   WhereRoute: WhereRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

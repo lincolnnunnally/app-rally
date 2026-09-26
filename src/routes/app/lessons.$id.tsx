@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { lessonNotesEditable } from "@/lib/lesson-notes";
 import { lessonIsOpen, lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, lessonWho, money, sportLabel } from "@/lib/rally";
+import { RallyCheckout } from "@/components/rally-pay";
 import { getLessonScan, setLessonStatus } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/app/lessons/$id")({
@@ -130,13 +131,26 @@ function LessonScan() {
         {role === "coach" ? <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} /> : null}
       </Card>
 
+      {l.price_cents ? (
+        <Card className="mt-6">
+          <p className="text-xs tracking-widest text-muted-foreground uppercase">Pay in Rally</p>
+          <h2 className="mt-2 font-display text-2xl">{money(l.price_cents)}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The player pays this price. Rally&apos;s fee comes out of the coach&apos;s side.
+          </p>
+          <div className="mt-4">
+            <RallyCheckout source="lesson" relatedId={l.id} />
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="mt-6">
         <p className="text-xs tracking-widest text-muted-foreground uppercase">
           {l.status === "completed" ? "Pay after check-out" : "Pay now or at the end"}
         </p>
         <h2 className="mt-2 font-display text-2xl">Cash App and Venmo</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Same handle QR as Books. Rally does not take a card.
+          Same handle QR as Books. This path stays outside Rally, so there is no platform fee.
         </p>
         <PayHandleShow
           cashApp={cash_app_handle}

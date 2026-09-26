@@ -21,6 +21,7 @@ import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
+import { abandonOpenPayment, payeeCanReceive, paymentsConfigured } from "@/lib/payments-server";
 
 export type { ReviewRow };
 
@@ -1150,7 +1151,7 @@ export const listReservations = createServerFn({ method: "GET" }).middleware([au
           from reservations r
           join courts c on c.id = r.court_id
           left join profiles p on p.user_id = r.user_id
-          where r.status in ('confirmed', 'pending') and r.ends_at > now()
+          where r.status in ('confirmed', 'pending', 'pending_payment') and r.ends_at > now()
           order by r.starts_at
         `).map((r) => ({
 		id: num(r.id),
@@ -1188,14 +1189,18 @@ export const createReservation = createServerFn({ method: "POST" }).middleware([
 		if (num((await sql`
         select count(*)::int as n from reservations
         where court_id = ${data.court_id}
-          and status in ('confirmed', 'pending')
+          and status in ('confirmed', 'pending', 'pending_payment')
           and starts_at < (${starts}::timestamp + make_interval(mins => ${data.duration_min}))
           and ends_at > ${starts}::timestamp
       `)[0]?.n ?? 0) > 0) throw new Error("That window is already claimed. Pick another time, or call the manager.");
 	}
 	const fee = mapped.player_fee_cents + (data.for_coaching ? mapped.coach_fee_cents : 0);
-	const scheduled = takeCents(fee, RALLY.courtPct);
-	const status = mapped.booking_mode === "call" ? "pending" : "confirmed";
+	const collectInApp = fee > 0 && paymentsConfigured();
+	if (collectInApp && (!mapped.added_by || !(await payeeCanReceive(sql, mapped.added_by)))) {
+		throw new Error("This facility hasn't finished payout setup.");
+	}
+	const scheduled = collectInApp ? 0 : takeCents(fee, RALLY.courtPct);
+	const status = collectInApp ? "pending_payment" : mapped.booking_mode === "call" ? "pending" : "confirmed";
 	const inserted = await sql`
       insert into reservations (court_id, user_id, sport, starts_at, ends_at, notes, status, fee_cents, for_coaching, rally_take_cents)
       values (
@@ -1206,15 +1211,21 @@ export const createReservation = createServerFn({ method: "POST" }).middleware([
       )
       returning id
     `;
-	const settled = await settleTake(sql, {
-		kind: "court_fee",
-		payerUserId: context.userId,
-		scheduled,
-		relatedId: num(inserted[0]?.id ?? 0),
-		note: `${mapped.name} · facility ${fee} · Rally ${scheduled}`
-	});
-	if (settled.take !== scheduled) await sql`update reservations set rally_take_cents = ${settled.take} where id = ${num(inserted[0]?.id ?? 0)}`;
-	const take = settled.take;
+	const reservationId = num(inserted[0]?.id ?? 0);
+	let take = scheduled;
+	let creditUsed = 0;
+	if (!collectInApp) {
+		const settled = await settleTake(sql, {
+			kind: "court_fee",
+			payerUserId: context.userId,
+			scheduled,
+			relatedId: reservationId,
+			note: `${mapped.name} · facility ${fee} · Rally ${scheduled}`
+		});
+		if (settled.take !== scheduled) await sql`update reservations set rally_take_cents = ${settled.take} where id = ${reservationId}`;
+		take = settled.take;
+		creditUsed = settled.creditUsed;
+	}
 	if (status === "pending") {
 		const who = mapped.manager_name ?? "the facility";
 		const phone = mapped.manager_phone ? ` Call ${mapped.manager_phone}.` : "";
@@ -1227,15 +1238,19 @@ export const createReservation = createServerFn({ method: "POST" }).middleware([
 	}
 	return {
 		ok: true,
+		id: reservationId,
 		status,
+		needs_payment: collectInApp,
 		fee_cents: fee,
 		rally_take_cents: take,
-		credit_used_cents: settled.creditUsed,
+		credit_used_cents: creditUsed,
 		manager_phone: mapped.manager_phone
 	};
 });
 export const cancelReservation = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({ id: z.coerce.number() })).handler(async ({ context, data }) => {
-	await (await getSql())`
+	const sql = await getSql();
+	await abandonOpenPayment("court", data.id, context.userId);
+	await sql`
       update reservations set status = 'cancelled'
       where id = ${data.id} and user_id = ${context.userId}
     `;
@@ -1809,6 +1824,14 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
         `;
 		const facilityTake = takeCents(fee, RALLY.facilityPct) + takeCents(cut, RALLY.facilityPct);
 		if (facilityTake > 0) await recordTake(sql, "facility", facilityTake, coach, data.id, "Rally share of facility fee/cut");
+		const stripePaid = (await sql`
+        select platform_fee_cents from payments
+        where source = 'lesson' and related_id = ${data.id} and status = 'paid'
+        limit 1
+      `)[0];
+		if (stripePaid) {
+			await sql`update lessons set rally_take_cents = ${num(stripePaid.platform_fee_cents) + facilityTake} where id = ${data.id}`;
+		} else {
 		const planRow = await sql`
         select billing_plan, created_at from coach_profiles where user_id = ${coach} limit 1
       `;
@@ -1856,6 +1879,7 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 			lessonTake = settled.take;
 		}
 		await sql`update lessons set rally_take_cents = ${(billing.plan === "monthly" ? 0 : lessonTake) + facilityTake} where id = ${data.id}`;
+		}
 		await notify(
 			sql,
 			context.userId === coach ? player : coach,
@@ -1977,6 +2001,21 @@ export const joinLeague = createServerFn({ method: "POST" }).middleware([authMid
 		const fee = num((await sql`
         select reg_fee_cents from leagues where id = ${data.id}
       `)[0]?.reg_fee_cents ?? 0);
+		if (fee > 0 && paymentsConfigured()) {
+			const paid = await sql`
+          select platform_fee_cents from payments
+          where source = 'league' and related_id = ${data.id}
+            and payer_user_id = ${context.userId} and status = 'paid'
+          limit 1
+        `;
+			if (!paid[0]) throw new Error("Pay the entry fee to join.");
+			await sql`
+          insert into league_members (league_id, user_id, fee_cents, rally_take_cents)
+          values (${data.id}, ${context.userId}, ${fee}, ${num(paid[0].platform_fee_cents)})
+          on conflict do nothing
+        `;
+			return { ok: true };
+		}
 		const scheduled = takeCents(fee, RALLY.leaguePct);
 		if ((await sql`
         insert into league_members (league_id, user_id, fee_cents, rally_take_cents)
@@ -2194,7 +2233,7 @@ export const homeFeed = createServerFn({ method: "GET" }).middleware([authMiddle
       select r.id, r.sport, r.starts_at::text as starts_at, r.status, c.name as court_name
       from reservations r
       join courts c on c.id = r.court_id
-      where r.user_id = ${context.userId} and r.status in ('confirmed', 'pending') and r.ends_at > now()
+      where r.user_id = ${context.userId} and r.status in ('confirmed', 'pending', 'pending_payment') and r.ends_at > now()
       order by r.starts_at
       limit 5
     `;

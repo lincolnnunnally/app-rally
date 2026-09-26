@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor } from "@/components/proof-lists";
+import { PayoutSetupCard } from "@/components/rally-pay";
 import { CoachInvite, LessonScanQr, PayHandleShow, PayHandles, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
@@ -357,6 +358,7 @@ function Desk() {
         </TabsContent>
 
         <TabsContent value="books" className="mt-6">
+          <PayoutSetupCard />
           {desk.data?.billing ? (
             <BillingCard
               listed={Boolean(desk.data.coach)}
@@ -786,9 +788,9 @@ function BillingCard({
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         Rally records the intended split: {RALLY.trialDays} days after you list, then{" "}
-        {RALLY.lessonPct}% of each completed lesson, or {money(RALLY.monthlyCents)} a month.
-        Rec at $0 stays $0. Card checkout is not on yet — Rally does not take payment in the
-        app until that path is proven.
+        {RALLY.lessonPct}% of each completed lesson, or {money(RALLY.monthlyCents)} a month,
+        when the player pays outside Rally. In-app card payments use the payout setup above.
+        Rec at $0 stays $0.
       </p>
       {billing.take_this_month > 0 ? (
         <p className="mt-2 text-sm">Rally this month: {money(billing.take_this_month)}</p>

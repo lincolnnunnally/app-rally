@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CourtMap } from "@/components/court-map";
+import { PayoutSetupCard, RallyCheckout } from "@/components/rally-pay";
 import {
   DirectionsButton,
   DirectionsLink,
@@ -37,6 +38,7 @@ import {
   money,
   sportLabel,
 } from "@/lib/rally";
+import { getPaymentsConfig, startCheckout } from "@/lib/payments-server";
 import {
   cancelReservation,
   createReservation,
@@ -55,6 +57,8 @@ function Courts() {
     queryKey: ["reservations"],
     queryFn: () => listReservations(),
   });
+  const payments = useQuery({ queryKey: ["pay-config"], queryFn: () => getPaymentsConfig() });
+  const courtPct = payments.data?.enabled ? payments.data.courtPct : RALLY.courtPct;
   const cancel = useMutation({
     mutationFn: (id: number) => cancelReservation({ data: { id } }),
     onSuccess: () => {
@@ -101,6 +105,10 @@ function Courts() {
             {c === "all" ? "Toombs" : c}
           </Button>
         ))}
+      </div>
+
+      <div className="mt-6">
+        <PayoutSetupCard />
       </div>
 
       <div className="mt-6 grid gap-4">
@@ -157,10 +165,10 @@ function Courts() {
                   {(c.player_fee_cents > 0 || c.coach_fee_cents > 0 || c.facility_cut_pct > 0) && (
                     <p className="mt-1 text-sm text-muted-foreground">
                       {c.player_fee_cents > 0
-                        ? `Player ${money(c.player_fee_cents)}${feeSplit(c.player_fee_cents, RALLY.courtPct).take ? ` · Rally ${money(feeSplit(c.player_fee_cents, RALLY.courtPct).take)}` : ""} · `
+                        ? `Player ${money(c.player_fee_cents)}${feeSplit(c.player_fee_cents, courtPct).take ? ` · Rally ${money(feeSplit(c.player_fee_cents, courtPct).take)}` : ""} · `
                         : ""}
                       {c.coach_fee_cents > 0
-                        ? `Coach court fee ${money(c.coach_fee_cents)}${feeSplit(c.coach_fee_cents, RALLY.courtPct).take ? ` · Rally ${money(feeSplit(c.coach_fee_cents, RALLY.courtPct).take)}` : ""} · `
+                        ? `Coach court fee ${money(c.coach_fee_cents)}${feeSplit(c.coach_fee_cents, courtPct).take ? ` · Rally ${money(feeSplit(c.coach_fee_cents, courtPct).take)}` : ""} · `
                         : ""}
                       {c.facility_cut_pct > 0
                         ? `Facility takes ${c.facility_cut_pct}% of a lesson · Rally ${RALLY.facilityPct}% of that cut`
@@ -221,15 +229,21 @@ function Courts() {
                         <span>
                           {formatWall(r.starts_at)} · {sportLabel(r.sport)}
                           {r.status === "pending" ? " · pending call" : ""}
+                          {r.status === "pending_payment" ? " · waiting on payment" : ""}
                           {r.fee_cents > 0 ? ` · ${money(r.fee_cents)}` : ""}
                           {r.rally_take_cents > 0 ? ` · Rally ${money(r.rally_take_cents)}` : ""}
                           <span className="text-muted-foreground"> · {r.mine ? "You" : r.holder_name}</span>
                         </span>
-                        {r.mine ? (
-                          <Button size="sm" variant="ghost" onClick={() => cancel.mutate(r.id)}>
-                            Release
-                          </Button>
-                        ) : null}
+                        <div className="flex flex-col items-end gap-2">
+                          {r.mine && r.fee_cents > 0 ? (
+                            <RallyCheckout source="court" relatedId={r.id} />
+                          ) : null}
+                          {r.mine ? (
+                            <Button size="sm" variant="ghost" onClick={() => cancel.mutate(r.id)}>
+                              Release
+                            </Button>
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -251,11 +265,19 @@ function ReserveDialog({ court, courts }: { court: Court; courts: Court[] }) {
     mutationFn: (data: Parameters<typeof createReservation>[0]["data"]) =>
       createReservation({ data }),
     onSuccess: (res) => {
+      if (res.needs_payment) {
+        void startCheckout({ data: { source: "court", relatedId: res.id } })
+          .then((pay) => {
+            window.location.assign(pay.url);
+          })
+          .catch((err: Error) => toast.error(err.message || "Payments coming soon"));
+        return;
+      }
       toast.success(
         res.status === "pending"
           ? `Held as pending. Call ${court.manager_name ?? "the facility"} to lock it.`
           : res.fee_cents
-            ? `Reserved · ${money(res.fee_cents)} on the card`
+            ? `Reserved · ${money(res.fee_cents)}`
             : "Reserved.",
       );
       setOpen(false);
@@ -266,8 +288,10 @@ function ReserveDialog({ court, courts }: { court: Court; courts: Court[] }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const payments = useQuery({ queryKey: ["pay-config"], queryFn: () => getPaymentsConfig() });
+  const courtPct = payments.data?.enabled ? payments.data.courtPct : RALLY.courtPct;
   const fee = court.player_fee_cents + (forCoach ? court.coach_fee_cents : 0);
-  const split = feeSplit(fee, RALLY.courtPct);
+  const split = feeSplit(fee, courtPct);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -337,7 +361,7 @@ function ReserveDialog({ court, courts }: { court: Court; courts: Court[] }) {
           {fee > 0 ? (
             <p className="text-sm">
               Due at the facility: <span className="font-medium">{money(fee)}</span>
-              {split.take > 0 ? ` · Rally ${money(split.take)} (${RALLY.courtPct}%) · facility keeps ${money(split.net)}` : ""}
+              {split.take > 0 ? ` · Rally ${money(split.take)} (${courtPct}%) · facility keeps ${money(split.net)}` : ""}
               {court.facility_cut_pct > 0 ? ` · they also take ${court.facility_cut_pct}% of a lesson (Rally ${RALLY.facilityPct}% of that cut)` : ""}
             </p>
           ) : (

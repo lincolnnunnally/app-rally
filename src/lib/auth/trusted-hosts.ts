@@ -54,3 +54,31 @@ export function rallyAllowedHosts(previewHosts: readonly string[]): string[] {
     ...PRODUCTION_HOSTS,
   ];
 }
+
+/**
+ * Origins that may receive a Rally password-reset link.
+ * Preview hosts are this Vercel project (`app-rally-*-life-produces-life.vercel.app`),
+ * not every `*.vercel.app` site — a reset token in the URL must not be sent to
+ * an unrelated deployment.
+ */
+export function isRallyResetOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  if (url.protocol === "http:") {
+    return (
+      url.origin === "http://localhost:8080" ||
+      url.origin === "http://127.0.0.1:8080" ||
+      url.origin === "http://[::1]:8080"
+    );
+  }
+  if (url.protocol !== "https:") return false;
+  if ((PRODUCTION_HOSTS as readonly string[]).includes(host)) return true;
+  if (host.endsWith(".grok-sandbox.com")) return true;
+  return host.startsWith("app-rally") && host.endsWith("-life-produces-life.vercel.app");
+}

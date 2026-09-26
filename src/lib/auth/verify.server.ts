@@ -1,4 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
+import { isOwnerEmail } from "../owner";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured } from "./server";
 
@@ -81,7 +82,14 @@ export async function getSessionUser(
  *   read/write everyone's rows.
  * - Auth disabled + no database -> the shared dev user id.
  */
-export async function requireUserId(bearerToken?: string): Promise<string> {
+export type VerifiedSession = { id: string; email: string | null; isOwner: boolean };
+
+/**
+ * Session identity for a server function. `isOwner` is the owner email at
+ * request time (`APP_ENGINE_OWNER_EMAIL`, else lincoln@unitedundergod.org).
+ * It is not stored as a role.
+ */
+export async function requireVerifiedUser(bearerToken?: string): Promise<VerifiedSession> {
   if (!authConfigured && !gateIdentityEnabled()) {
     if (databaseConfigured) {
       throw new Error(
@@ -89,9 +97,13 @@ export async function requireUserId(bearerToken?: string): Promise<string> {
           "refusing to fall back to the shared dev user against a real database.",
       );
     }
-    return DEV_USER_ID;
+    return { id: DEV_USER_ID, email: null, isOwner: false };
   }
   const user = await getSessionUser(bearerToken);
   if (!user) throw new UnauthorizedError();
-  return user.id;
+  return { id: user.id, email: user.email, isOwner: isOwnerEmail(user.email) };
+}
+
+export async function requireUserId(bearerToken?: string): Promise<string> {
+  return (await requireVerifiedUser(bearerToken)).id;
 }

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } from "@/lib/auth/client";
+import { rallyResetRedirect } from "@/lib/auth/reset-redirect";
+import { runEmailSignIn } from "@/lib/auth/sign-in-outcome";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { consumeAppNext, rememberCoach, rememberRef } from "@/lib/rally";
 
@@ -42,25 +44,25 @@ function Login() {
     setBusy(true);
     try {
       const dest = consumeAppNext() ?? "/app";
-      if (mode === "up") {
-        const res = await authClient.signUp.email({
-          email,
-          password,
-          name: name || email.split("@")[0],
-          callbackURL: dest,
-        });
-        if (res.error) throw new Error(res.error.message || "Could not create account");
-      } else {
-        const res = await authClient.signIn.email({
-          email,
-          password,
-          callbackURL: dest,
-        });
-        if (res.error) throw new Error(res.error.message || "Could not sign in");
+      const fallback = mode === "up" ? "Could not create account" : "Could not sign in";
+      const result = await runEmailSignIn({
+        dest,
+        fallback,
+        request: () =>
+          mode === "up"
+            ? authClient.signUp.email({
+                email,
+                password,
+                name: name || email.split("@")[0],
+                callbackURL: dest,
+              })
+            : authClient.signIn.email({ email, password, callbackURL: dest }),
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
       }
-      window.location.assign(dest);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed");
+      if (result.navigateTo) window.location.assign(result.navigateTo);
     } finally {
       setBusy(false);
     }
@@ -94,7 +96,7 @@ function Login() {
       }
       const res = await requestReset({
         email: trimmed,
-        redirectTo: "/reset-password",
+        redirectTo: rallyResetRedirect(window.location.origin),
       });
       if (res.error) {
         setError(
@@ -229,13 +231,17 @@ function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={mode === "up" ? 8 : undefined}
               />
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button type="submit" disabled={busy}>
               {busy ? "Working…" : mode === "in" ? "Sign in with email" : "Create account"}
             </Button>
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
           </form>
         )}
 

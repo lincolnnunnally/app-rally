@@ -46,6 +46,7 @@ import {
   PREVIEW_CLIENT_ID,
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
+import { originFromHeaders } from "./reset-redirect";
 import { rallyAllowedHosts, rallyTrustedOrigins } from "./trusted-hosts";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
@@ -227,18 +228,27 @@ export const auth = betterAuth({
         emailAndPassword: {
           enabled: true,
           resetPasswordTokenExpiresIn: 60 * 60,
-          sendResetPassword: async ({
-            user,
-            url,
-          }: {
-            user: { email: string; name?: string | null };
-            url: string;
-          }) => {
+          sendResetPassword: async (
+            {
+              user,
+              url,
+            }: {
+              user: { email: string; name?: string | null };
+              url: string;
+            },
+            request,
+          ) => {
             const { sendRallyResetMail } = await import("./reset-mail");
+            const { rallyResetEmailUrl } = await import("./reset-redirect");
+            const headers = request instanceof Request ? request.headers : null;
             await sendRallyResetMail({
               email: user.email,
               name: user.name ?? undefined,
-              url,
+              url: rallyResetEmailUrl({
+                url,
+                requestOrigin: headers ? originFromHeaders(headers) : null,
+                siteUrl: env("APP_PUBLIC_URL"),
+              }),
             });
           },
         },

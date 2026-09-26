@@ -795,7 +795,8 @@ export const bootstrap = createServerFn({ method: "GET" }).middleware([authMiddl
 	return {
 		profile,
 		courts: (await sql`select * from courts order by status, is_other, city, name`).map(mapCourt),
-		userId: context.userId
+		userId: context.userId,
+		isOwner: context.isOwner === true
 	};
 });
 function mapCourt(r: Record<string, unknown>): Court {

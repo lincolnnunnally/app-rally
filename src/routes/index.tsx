@@ -45,7 +45,7 @@ function Home() {
     <main className="min-h-dvh bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
         <RallyWordmark />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button asChild variant="ghost">
             <Link to="/where">Find a court</Link>
           </Button>
@@ -56,11 +56,18 @@ function Home() {
               <Link to="/app">Open Rally</Link>
             </Button>
           ) : (
-            <Button asChild>
-              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
-                Join
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="secondary">
+                <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "in" }}>
+                  Sign in
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
+                  Join
+                </Link>
+              </Button>
+            </>
           )}
         </div>
       </header>

@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Court, Profile } from "@/lib/rally";
 
-export type RallyContextValue = { profile: Profile; courts: Court[] };
+export type RallyContextValue = { profile: Profile; courts: Court[]; isOwner: boolean };
 
 const RallyContext = createContext<RallyContextValue | null>(null);
 

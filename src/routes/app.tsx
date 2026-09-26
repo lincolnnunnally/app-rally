@@ -52,7 +52,7 @@ function AppGate() {
   }
 
   return (
-    <RallyProvider value={{ profile: data.profile, courts: data.courts }}>
+    <RallyProvider value={{ profile: data.profile, courts: data.courts, isOwner: data.isOwner === true }}>
       <AppShell />
     </RallyProvider>
   );

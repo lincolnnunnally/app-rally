@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { PayoutSetupCard, RallyCheckout } from "@/components/rally-pay";
+import { getPaymentsConfig } from "@/lib/payments-server";
 import { createLeague, joinLeague, listLeagues } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/app/leagues/")({ component: Leagues });
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/app/leagues/")({ component: Leagues });
 function Leagues() {
   const qc = useQueryClient();
   const leagues = useQuery({ queryKey: ["leagues"], queryFn: () => listLeagues() });
+  const payments = useQuery({ queryKey: ["pay-config"], queryFn: () => getPaymentsConfig() });
   const join = useMutation({
     mutationFn: (data: { id: number; join: boolean }) => joinLeague({ data }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["leagues"] }),
@@ -38,6 +41,9 @@ function Leagues() {
           <h1 className="mt-2 font-display text-4xl">Rosters that stick</h1>
         </div>
         <CreateLeague />
+      </div>
+      <div className="mt-6">
+        <PayoutSetupCard />
       </div>
       <div className="mt-8 flex flex-col gap-3">
         {leagues.isSuccess && (leagues.data ?? []).length === 0 ? (
@@ -64,24 +70,39 @@ function Leagues() {
                 {l.skill_band ? ` · ${l.skill_band}` : ""}
                 {l.season_label ? ` · ${l.season_label}` : ""}
                 {` · ${l.member_count} on roster`}
-                {l.reg_fee_cents > 0 ? ` · ${money(l.reg_fee_cents)} to join · Rally ${money(feeSplit(l.reg_fee_cents, RALLY.leaguePct).take)}` : ""}
+                {l.reg_fee_cents > 0
+                  ? ` · ${money(l.reg_fee_cents)} to join · Rally ${money(feeSplit(l.reg_fee_cents, payments.data?.enabled ? payments.data.leaguePct : RALLY.leaguePct).take)}`
+                  : ""}
               </p>
               {l.notes ? <p className="mt-2 text-sm leading-relaxed">{l.notes}</p> : null}
             </div>
-            <div className="flex gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link to="/app/leagues/$id" params={{ id: String(l.id) }}>
-                  Board
-                </Link>
-              </Button>
-              <Button
-                size="sm"
-                variant={l.joined ? "secondary" : "default"}
-                disabled={join.isPending}
-                onClick={() => join.mutate({ id: l.id, join: !l.joined })}
-              >
-                {l.joined ? "Leave" : l.reg_fee_cents > 0 ? `Join · ${money(l.reg_fee_cents)}` : "Join"}
-              </Button>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/app/leagues/$id" params={{ id: String(l.id) }}>
+                    Board
+                  </Link>
+                </Button>
+                {l.joined || l.reg_fee_cents === 0 || !payments.data?.enabled ? (
+                  <Button
+                    size="sm"
+                    variant={l.joined ? "secondary" : "default"}
+                    disabled={join.isPending}
+                    onClick={() => join.mutate({ id: l.id, join: !l.joined })}
+                  >
+                    {l.joined ? "Leave" : l.reg_fee_cents > 0 ? `Join · ${money(l.reg_fee_cents)}` : "Join"}
+                  </Button>
+                ) : (
+                  <RallyCheckout
+                    source="league"
+                    relatedId={l.id}
+                    onRejoin={() => join.mutate({ id: l.id, join: true })}
+                  />
+                )}
+              </div>
+              {l.reg_fee_cents > 0 && payments.data && !payments.data.enabled ? (
+                <p className="text-xs text-muted-foreground">Payments coming soon</p>
+              ) : null}
             </div>
           </Card>
         ))}
@@ -164,7 +185,8 @@ function CreateLeague() {
             <Label>Registration fee $ (optional)</Label>
             <Input name="reg_fee" type="number" min={0} defaultValue={0} />
             <p className="text-xs text-muted-foreground">
-              Rally takes {RALLY.leaguePct}% of a registration fee. $0 means Rally takes nothing.
+              When players pay in Rally, the platform fee comes out of the organizer&apos;s side. $0
+              means Rally takes nothing.
             </p>
           </div>
           <div className="flex flex-col gap-1.5">

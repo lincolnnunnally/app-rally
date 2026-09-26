@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { formatLabel, formatWall, money, sportLabel } from "@/lib/rally";
+import { LeagueEntryPayments, PayoutSetupCard, RallyCheckout } from "@/components/rally-pay";
+import { getPaymentsConfig } from "@/lib/payments-server";
 import { getLeague, joinLeague, scheduleMatch, updateMatch } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/app/leagues/$id")({ component: LeagueDetail });
@@ -25,6 +27,7 @@ function LeagueDetail() {
     queryKey: ["league", leagueId],
     queryFn: () => getLeague({ data: { id: leagueId } }),
   });
+  const payments = useQuery({ queryKey: ["pay-config"], queryFn: () => getPaymentsConfig() });
   const join = useMutation({
     mutationFn: (joinIn: boolean) => joinLeague({ data: { id: leagueId, join: joinIn } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["league", leagueId] }),
@@ -59,13 +62,28 @@ function LeagueDetail() {
             {league.reg_fee_cents > 0 ? ` · ${money(league.reg_fee_cents)} to join` : ""}
           </p>
         </div>
-        <Button
-          variant={league.joined ? "secondary" : "default"}
-          onClick={() => join.mutate(!league.joined)}
-        >
-          {league.joined ? "Leave" : league.reg_fee_cents > 0 ? `Join · ${money(league.reg_fee_cents)}` : "Join"}
-        </Button>
+        <div className="flex flex-col items-end gap-2">
+          {league.joined || league.reg_fee_cents === 0 || !payments.data?.enabled ? (
+            <Button
+              variant={league.joined ? "secondary" : "default"}
+              onClick={() => join.mutate(!league.joined)}
+            >
+              {league.joined ? "Leave" : league.reg_fee_cents > 0 ? `Join · ${money(league.reg_fee_cents)}` : "Join"}
+            </Button>
+          ) : (
+            <RallyCheckout
+              source="league"
+              relatedId={leagueId}
+              onRejoin={() => join.mutate(true)}
+            />
+          )}
+          {league.reg_fee_cents > 0 && payments.data && !payments.data.enabled ? (
+            <p className="text-xs text-muted-foreground">Payments coming soon</p>
+          ) : null}
+        </div>
       </div>
+      {league.owner_user_id === userId ? <PayoutSetupCard /> : null}
+      {league.owner_user_id === userId ? <LeagueEntryPayments leagueId={leagueId} /> : null}
       {league.notes ? <p className="mt-4 max-w-xl text-sm leading-relaxed">{league.notes}</p> : null}
 
       <section className="mt-8">

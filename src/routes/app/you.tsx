@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { PlayerSportCards } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
+import { PlatformFeesCard } from "@/components/rally-pay";
 import { CoachInvite, ShareRally } from "@/components/share-rally";
 import { UserButton } from "@/lib/auth/gates";
 import { useRally } from "@/lib/rally-context";
@@ -49,6 +50,7 @@ function You() {
       <div className="mt-8">
         <ShareRally code={profile.share_code} creditCents={profile.credit_cents} />
       </div>
+      <PlatformFeesCard />
       <div className="mt-8 grid gap-3">
         <Link to="/app/mental" search={{ after: "court" }}>
           <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">

@@ -45,6 +45,7 @@ export interface Sql {
  */
 const globalRef = globalThis as typeof globalThis & {
   __pgSqlPromise__?: Promise<Sql>;
+  __pgPool__?: Promise<import("pg").Pool>;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
 };
@@ -98,19 +99,29 @@ function connectionStringForPg(url: string): string {
   }
 }
 
-function createNeonSql(): Promise<Sql> {
-  globalRef.__pgSqlPromise__ ??= (async () => {
+function neonPool(): Promise<import("pg").Pool> {
+  globalRef.__pgPool__ ??= (async () => {
     // Regular Postgres driver (node-postgres). Production: LPL Supabase pooler.
     // One pool per process; warm serverless instances reuse it.
     const { Pool, types } = await import("pg");
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({
+    return new Pool({
       connectionString: connectionStringForPg(databaseUrl!),
       ssl: { rejectUnauthorized: false },
       max: 4,
     });
+  })().catch((err) => {
+    globalRef.__pgPool__ = undefined;
+    throw err;
+  });
+  return globalRef.__pgPool__;
+}
+
+function createNeonSql(): Promise<Sql> {
+  globalRef.__pgSqlPromise__ ??= (async () => {
+    const pool = await neonPool();
     return toSql(async <T>(text: string, params: unknown[]) => {
       const client = await pool.connect();
       try {
@@ -215,6 +226,48 @@ export function getSql(): Promise<Sql> {
     throw err;
   });
   return sqlPromise;
+}
+
+/**
+ * Run `fn` on one connection inside a transaction. The lesson-fee cap locks a
+ * month row here so two checkouts cannot both charge under the cap.
+ */
+export async function withTransaction<T>(fn: (sql: Sql) => Promise<T>): Promise<T> {
+  if (typeof window !== "undefined") {
+    throw new Error("withTransaction is server-only.");
+  }
+  if (dbSource === "neon") {
+    const pool = await neonPool();
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("set search_path to rally, public");
+      const sql = toSql(async <TRow>(text: string, params: unknown[]) => {
+        const res = await client.query(text, params);
+        return res.rows as TRow[];
+      });
+      const result = await fn(sql);
+      await client.query("commit");
+      return result;
+    } catch (err) {
+      try {
+        await client.query("rollback");
+      } catch {
+        // The original error is the one to surface.
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  const pg = await getPglite();
+  return pg.transaction(async (tx) => {
+    const sql = toSql(async <TRow>(text: string, params: unknown[]) => {
+      const result = await tx.query<TRow>(text, params);
+      return result.rows;
+    });
+    return fn(sql);
+  });
 }
 
 /**

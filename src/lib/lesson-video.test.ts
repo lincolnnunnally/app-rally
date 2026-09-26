@@ -1,20 +1,25 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  assertLessonVideoPayload,
+  assertLessonVideoChoice,
+  canActorOwnLessonVideoPath,
   canActorSaveLessonVideo,
   isLessonVideoData,
+  isLessonVideoObjectPath,
   lessonVideoEditable,
   lessonVideoNotice,
   lessonVideoNoticeTarget,
+  lessonVideoObjectPath,
   showsPlayerLessonVideo,
   withCoachAsPlayer,
-  LESSON_VIDEO_MAX,
+  LESSON_VIDEO_ERRORS,
+  LESSON_VIDEO_MAX_BYTES,
 } from "./lesson-video.ts";
 
 const coach = "coach-1";
 const player = "player-1";
 const other = "other-1";
+const clip = "11111111-1111-4111-8111-111111111111";
 
 describe("lessonVideoEditable", () => {
   it("uses the same upcoming/completed window as notes", () => {
@@ -111,16 +116,135 @@ describe("lessonVideoNotice", () => {
   });
 });
 
-describe("assertLessonVideoPayload", () => {
-  it("clears on empty and accepts a data-URI video", () => {
-    assert.equal(assertLessonVideoPayload(""), null);
-    assert.equal(assertLessonVideoPayload("data:video/mp4;base64,AAAA"), "data:video/mp4;base64,AAAA");
+describe("assertLessonVideoChoice", () => {
+  it("accepts a 6 second phone clip that used to hit the data-URI cap", () => {
+    const choice = assertLessonVideoChoice({
+      contentType: "video/mp4",
+      fileName: "IMG_0001.mp4",
+      byteSize: 4_600_000,
+      durationSec: 6,
+    });
+    assert.equal(choice.contentType, "video/mp4");
+    assert.equal(choice.extension, "mp4");
+  });
+
+  it("reads mov from the file name when the phone leaves the type blank", () => {
+    const choice = assertLessonVideoChoice({
+      contentType: "",
+      fileName: "clip.MOV",
+      byteSize: 1_000_000,
+      durationSec: 20,
+    });
+    assert.equal(choice.contentType, "video/quicktime");
+    assert.equal(choice.extension, "mov");
+  });
+
+  it("says over 60 seconds when the clip is too long", () => {
+    assert.throws(
+      () =>
+        assertLessonVideoChoice({
+          contentType: "video/mp4",
+          fileName: "long.mp4",
+          byteSize: 4_600_000,
+          durationSec: 61,
+        }),
+      new Error(LESSON_VIDEO_ERRORS.tooLong),
+    );
+  });
+
+  it("says over 50 MB when the file is too big", () => {
+    assert.throws(
+      () =>
+        assertLessonVideoChoice({
+          contentType: "video/mp4",
+          fileName: "big.mp4",
+          byteSize: LESSON_VIDEO_MAX_BYTES + 1,
+          durationSec: 10,
+        }),
+      new Error(LESSON_VIDEO_ERRORS.tooBig),
+    );
+  });
+
+  it("rejects a photo with its own message", () => {
+    assert.throws(
+      () =>
+        assertLessonVideoChoice({
+          contentType: "image/jpeg",
+          fileName: "still.jpg",
+          byteSize: 200_000,
+          durationSec: 1,
+        }),
+      new Error(LESSON_VIDEO_ERRORS.type),
+    );
+  });
+
+  it("keeps reading an old data-URI clip", () => {
     assert.equal(isLessonVideoData("data:video/webm;base64,AAAA"), true);
     assert.equal(isLessonVideoData(null), false);
   });
+});
 
-  it("rejects photos and oversized payloads", () => {
-    assert.throws(() => assertLessonVideoPayload("data:image/jpeg;base64,xx"), /stroke clip/);
-    assert.throws(() => assertLessonVideoPayload(`data:video/mp4;base64,${"A".repeat(LESSON_VIDEO_MAX)}`), /too large/);
+describe("lesson video object path", () => {
+  it("keeps the object inside that lesson folder", () => {
+    const path = lessonVideoObjectPath(7, clip, "mp4");
+    assert.equal(path, `7/${clip}.mp4`);
+    assert.equal(isLessonVideoObjectPath(7, path), true);
+    assert.equal(isLessonVideoObjectPath(8, path), false);
+    assert.equal(isLessonVideoObjectPath(7, `7/../8/${clip}.mp4`), false);
+    assert.equal(isLessonVideoObjectPath(7, `7/${clip}.jpg`), false);
+  });
+
+  it("lets the coach or the student own the path, not a stranger", () => {
+    const objectPath = lessonVideoObjectPath(7, clip, "mov");
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: coach,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath,
+      }),
+      true,
+    );
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: player,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath,
+      }),
+      true,
+    );
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: coach,
+        coachId: coach,
+        playerId: coach,
+        lessonId: 7,
+        objectPath,
+      }),
+      true,
+    );
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: other,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath,
+      }),
+      false,
+    );
+    assert.equal(
+      canActorOwnLessonVideoPath({
+        actorId: coach,
+        coachId: coach,
+        playerId: player,
+        lessonId: 7,
+        objectPath: lessonVideoObjectPath(9, clip, "mp4"),
+      }),
+      false,
+    );
   });
 });

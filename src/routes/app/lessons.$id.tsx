@@ -101,14 +101,9 @@ function LessonScan() {
 
       <Card className="mt-6">
         {canEditVideo ? (
-          <LessonVideoEditor
-            key={`${l.id}:${l.video_data ?? ""}`}
-            lessonId={l.id}
-            video={l.video_data ?? null}
-            hasVideo={l.has_video}
-          />
+          <LessonVideoEditor key={`${l.id}:video`} lessonId={l.id} hasVideo={l.has_video} />
         ) : (
-          <LessonVideoRead video={l.video_data ?? null} hasVideo={l.has_video} />
+          <LessonVideoRead lessonId={l.id} hasVideo={l.has_video} />
         )}
       </Card>
 

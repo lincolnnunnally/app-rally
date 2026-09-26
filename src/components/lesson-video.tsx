@@ -3,12 +3,15 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  isLessonVideoData,
+  assertLessonVideoChoice,
+  isLessonVideoSrc,
+  LESSON_VIDEO_ERRORS,
   LESSON_VIDEO_HELP,
   LESSON_VIDEO_LABEL,
-  readLessonVideo,
+  readLessonVideoDuration,
+  uploadLessonVideoFile,
 } from "@/lib/lesson-video";
-import { getLessonVideo, saveLessonVideo } from "@/lib/rally-server";
+import { commitLessonVideo, getLessonVideo, prepareLessonVideoUpload, removeLessonVideo } from "@/lib/rally-server";
 
 function LessonVideoPlayer({ video }: { video: string }) {
   return (
@@ -22,19 +25,35 @@ function LessonVideoPlayer({ video }: { video: string }) {
   );
 }
 
+function useLessonVideoSrc(lessonId: number | undefined, video: string | null | undefined, hasVideo?: boolean) {
+  const needFetch = Boolean(lessonId) && video === undefined && Boolean(hasVideo);
+  const loaded = useQuery({
+    queryKey: ["lesson-video", lessonId],
+    queryFn: () => getLessonVideo({ data: { id: lessonId! } }),
+    enabled: needFetch,
+  });
+  const current = video !== undefined ? video : (loaded.data?.src ?? null);
+  const [local, setLocal] = useState<string | null | undefined>(undefined);
+  const shown = local !== undefined ? local : current;
+  return { shown, setLocal };
+}
+
 export function LessonVideoRead({
   video,
   hasVideo,
+  lessonId,
 }: {
   video?: string | null;
   hasVideo?: boolean;
+  lessonId?: number;
 }) {
-  const playable = isLessonVideoData(video);
+  const { shown } = useLessonVideoSrc(lessonId, video, hasVideo);
+  const playable = isLessonVideoSrc(shown);
   return (
     <div>
       <p className="text-xs tracking-widest text-muted-foreground uppercase">{LESSON_VIDEO_LABEL}</p>
       {playable ? (
-        <LessonVideoPlayer video={video!} />
+        <LessonVideoPlayer video={shown!} />
       ) : hasVideo ? (
         <p className="mt-2 text-sm text-muted-foreground">
           Practice / stroke video is on this lesson — open the lesson to play it.
@@ -58,65 +77,86 @@ export function LessonVideoEditor({
   onSaved?: () => void;
 }) {
   const qc = useQueryClient();
-  const needFetch = video === undefined && Boolean(hasVideo);
-  const loaded = useQuery({
-    queryKey: ["lesson-video", lessonId],
-    queryFn: () => getLessonVideo({ data: { id: lessonId } }),
-    enabled: needFetch,
-  });
-  const current = video !== undefined ? video : (loaded.data?.video_data ?? null);
-  const [local, setLocal] = useState<string | null | undefined>(undefined);
-  const shown = local !== undefined ? local : current;
+  const { shown, setLocal } = useLessonVideoSrc(lessonId, video, hasVideo);
+
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["desk"] });
+    void qc.invalidateQueries({ queryKey: ["my-lessons"] });
+    void qc.invalidateQueries({ queryKey: ["lesson-scan", lessonId] });
+    void qc.invalidateQueries({ queryKey: ["lesson-video", lessonId] });
+    void qc.invalidateQueries({ queryKey: ["home"] });
+    void qc.invalidateQueries({ queryKey: ["notices"] });
+    onSaved?.();
+  };
 
   const save = useMutation({
-    mutationFn: (next: string) => saveLessonVideo({ data: { id: lessonId, video_data: next } }),
-    onSuccess: (_, next) => {
-      setLocal(next || null);
-      toast.success(next ? "Practice video saved on this lesson." : "Practice video removed.");
-      void qc.invalidateQueries({ queryKey: ["desk"] });
-      void qc.invalidateQueries({ queryKey: ["my-lessons"] });
-      void qc.invalidateQueries({ queryKey: ["lesson-scan", lessonId] });
-      void qc.invalidateQueries({ queryKey: ["lesson-video", lessonId] });
-      void qc.invalidateQueries({ queryKey: ["home"] });
-      void qc.invalidateQueries({ queryKey: ["notices"] });
-      onSaved?.();
+    mutationFn: async (file: File) => {
+      const durationSec = await readLessonVideoDuration(file);
+      const choice = assertLessonVideoChoice({
+        contentType: file.type,
+        fileName: file.name,
+        byteSize: file.size,
+        durationSec,
+      });
+      const prepared = await prepareLessonVideoUpload({
+        data: {
+          id: lessonId,
+          content_type: choice.contentType,
+          byte_size: file.size,
+          duration_sec: durationSec,
+        },
+      });
+      try {
+        await uploadLessonVideoFile(prepared.signedUrl, file);
+      } catch (err) {
+        throw err instanceof Error ? err : new Error(LESSON_VIDEO_ERRORS.upload);
+      }
+      return commitLessonVideo({ data: { id: lessonId, video_path: prepared.path } });
+    },
+    onSuccess: (result) => {
+      setLocal(result.src);
+      toast.success("Practice video saved on this lesson.");
+      refresh();
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const remove = useMutation({
+    mutationFn: () => removeLessonVideo({ data: { id: lessonId } }),
+    onSuccess: () => {
+      setLocal(null);
+      toast.success("Practice video removed.");
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const busy = save.isPending || remove.isPending;
+  const playable = isLessonVideoSrc(shown);
 
   return (
     <div className="grid gap-2">
       <p className="text-xs tracking-widest text-muted-foreground uppercase">{LESSON_VIDEO_LABEL}</p>
       <p className="text-xs text-muted-foreground">{LESSON_VIDEO_HELP}</p>
-      {isLessonVideoData(shown) ? <LessonVideoPlayer video={shown!} /> : null}
+      {playable ? <LessonVideoPlayer video={shown!} /> : null}
       <label className="text-sm font-medium">
-        {isLessonVideoData(shown) ? "Replace clip" : "Upload clip"}
+        {playable ? "Replace clip" : "Upload clip"}
         <input
           type="file"
-          accept="video/*"
+          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
           className="mt-1 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground"
-          disabled={save.isPending}
+          disabled={busy}
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
             if (!file) return;
-            void readLessonVideo(file)
-              .then((data) => save.mutate(data))
-              .catch((err: unknown) => {
-                toast.error(err instanceof Error ? err.message : "Could not use that video.");
-              });
+            save.mutate(file);
           }}
         />
       </label>
-      {isLessonVideoData(shown) ? (
+      {playable ? (
         <div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={save.isPending}
-            onClick={() => save.mutate("")}
-          >
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => remove.mutate()}>
             Remove video
           </Button>
         </div>

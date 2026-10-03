@@ -31,6 +31,7 @@ import { Route as AppPlayRouteImport } from './routes/app/play'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
 import { Route as AppProgressRouteImport } from './routes/app/progress'
 import { Route as AppYouRouteImport } from './routes/app/you'
+import { Route as ClaimCodeRouteImport } from './routes/claim.$code'
 import { Route as WhereIndexRouteImport } from './routes/where.index'
 import { Route as WhereCityRouteImport } from './routes/where.$city'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -150,6 +151,11 @@ const AppYouRoute = AppYouRouteImport.update({
   path: '/you',
   getParentRoute: () => AppRoute,
 } as any)
+const ClaimCodeRoute = ClaimCodeRouteImport.update({
+  id: '/claim/$code',
+  path: '/claim/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WhereIndexRoute = WhereIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -213,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/claim/$code': typeof ClaimCodeRoute
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/claim/$code': typeof ClaimCodeRoute
   '/app': typeof AppIndexRoute
   '/where': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -274,6 +282,7 @@ export interface FileRoutesById {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/claim/$code': typeof ClaimCodeRoute
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
@@ -308,6 +317,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/claim/$code'
     | '/where/$city'
     | '/app/'
     | '/where/'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/claim/$code'
     | '/app'
     | '/where'
     | '/api/auth/$'
@@ -368,6 +379,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/claim/$code'
     | '/where/$city'
     | '/app/'
     | '/where/'
@@ -391,6 +403,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   WhereRoute: typeof WhereRouteWithChildren
+  ClaimCodeRoute: typeof ClaimCodeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -550,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppYouRouteImport
       parentRoute: typeof AppRoute
     }
+    '/claim/$code': {
+      id: '/claim/$code'
+      path: '/claim/$code'
+      fullPath: '/claim/$code'
+      preLoaderRoute: typeof ClaimCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/where/': {
       id: '/where/'
       path: '/'
@@ -693,17 +713,9 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   WhereRoute: WhereRouteWithChildren,
+  ClaimCodeRoute: ClaimCodeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

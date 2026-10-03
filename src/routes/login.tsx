@@ -8,7 +8,7 @@ import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } fr
 import { rallyResetRedirect } from "@/lib/auth/reset-redirect";
 import { runEmailSignIn } from "@/lib/auth/sign-in-outcome";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { consumeAppNext, rememberCoach, rememberRef } from "@/lib/rally";
+import { consumeAppNext, peekAppNext, rememberCoach, rememberRef } from "@/lib/rally";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -36,7 +36,13 @@ function Login() {
     if (coach) rememberCoach(coach);
   }, [ref, coach]);
 
-  if (user) return <Navigate to="/app" />;
+  if (user) {
+    const next = peekAppNext();
+    if (next?.startsWith("/claim/")) {
+      return <Navigate to="/claim/$code" params={{ code: next.slice("/claim/".length) }} />;
+    }
+    return <Navigate to="/app" />;
+  }
 
   async function onEmail(e: FormEvent) {
     e.preventDefault();

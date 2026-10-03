@@ -3,9 +3,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
-import { LessonNotesEditor } from "@/components/lesson-notes";
+import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
+import {
+  CopyClaimLink,
+  FinishStudentForm,
+  RegisterChildForm,
+  ScheduleChildForm,
+} from "@/components/students";
 import { LessonVideoEditor } from "@/components/lesson-video";
 import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
+import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL, scheduleStudents } from "@/lib/students";
+import { createStudent, listHousehold } from "@/lib/students-server";
 import { lessonIsOpen } from "@/lib/lesson-status";
 import { withCoachAsPlayer } from "@/lib/lesson-video";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
@@ -36,7 +44,6 @@ import {
   addLedgerEntry,
   deleteCoachService,
   getCoachDesk,
-  listDirectory,
   logLesson,
   saveCoachBilling,
   saveCoachPayHandles,
@@ -54,7 +61,7 @@ function Desk() {
   const { profile, courts } = useRally();
   const qc = useQueryClient();
   const desk = useQuery({ queryKey: ["desk"], queryFn: () => getCoachDesk() });
-  const directory = useQuery({ queryKey: ["directory"], queryFn: () => listDirectory() });
+  const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
   const [payFor, setPayFor] = useState<LessonRow | null>(null);
   const setStatus = useMutation({
     mutationFn: (data: {
@@ -79,6 +86,7 @@ function Desk() {
     void qc.invalidateQueries({ queryKey: ["home"] });
     void qc.invalidateQueries({ queryKey: ["my-lessons"] });
     void qc.invalidateQueries({ queryKey: ["notices"] });
+    void qc.invalidateQueries({ queryKey: ["household"] });
   };
 
   const upcoming = (desk.data?.lessons ?? []).filter((l) => lessonIsOpen(l.status));
@@ -86,17 +94,11 @@ function Desk() {
   const completed = (desk.data?.lessons ?? []).filter((l) => l.status === "completed");
   const pipeline = desk.data?.pipeline;
   const logPeople = useMemo(() => {
-    const map = new Map<string, { user_id: string; display_name: string }>();
-    for (const p of directory.data ?? []) map.set(p.user_id, { user_id: p.user_id, display_name: p.display_name });
-    for (const r of desk.data?.roster ?? []) map.set(r.user_id, { user_id: r.user_id, display_name: r.display_name });
-    for (const l of desk.data?.lessons ?? []) {
-      map.set(l.player_user_id, { user_id: l.player_user_id, display_name: l.player_name });
-    }
     return withCoachAsPlayer(
       { user_id: profile.user_id, display_name: profile.display_name },
-      [...map.values()],
+      scheduleStudents(desk.data?.students ?? []),
     );
-  }, [directory.data, desk.data?.roster, desk.data?.lessons, profile.display_name, profile.user_id]);
+  }, [desk.data?.students, profile.display_name, profile.user_id]);
   const [logPlayerId, setLogPlayerId] = useState<string | undefined>();
 
   return (
@@ -141,6 +143,8 @@ function Desk() {
           <div className="mb-8">
             <CoachInvite code={profile.share_code} coachName={profile.display_name} />
           </div>
+          <StudentsPanel students={desk.data?.students ?? []} onSaved={refreshDesk} />
+          <div className="mt-8">
           <LogLessonForm
             key={`${logPlayerId ?? "auto"}:${upcoming.length === 0 ? "empty" : "has"}`}
             courts={courts}
@@ -153,6 +157,7 @@ function Desk() {
               refreshDesk();
             }}
           />
+          </div>
 
           <section className="mt-10">
             <h2 className="font-display text-2xl">Requests</h2>
@@ -248,6 +253,13 @@ function Desk() {
                       </Button>
                     </div>
                     <div className="mt-4 border-t border-border pt-3">
+                      <PrivateNotesEditor
+                        key={`${l.id}:private:${l.private_notes ?? ""}`}
+                        lessonId={l.id}
+                        notes={l.private_notes}
+                      />
+                    </div>
+                    <div className="mt-4 border-t border-border pt-3">
                       <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
                     </div>
                     <div className="mt-4 border-t border-border pt-3">
@@ -321,6 +333,13 @@ function Desk() {
                       </Button>
                     </div>
                     <div className="mt-3">
+                      <PrivateNotesEditor
+                        key={`${l.id}:private:${l.private_notes ?? ""}`}
+                        lessonId={l.id}
+                        notes={l.private_notes}
+                      />
+                    </div>
+                    <div className="mt-3">
                       <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
                     </div>
                     <div className="mt-4 border-t border-border pt-3">
@@ -364,6 +383,13 @@ function Desk() {
               </div>
             ) : null}
           </section>
+
+          <HouseholdPanel
+            childrenRows={household.data?.children ?? []}
+            coaches={household.data?.coaches ?? []}
+            courts={household.data?.courts ?? []}
+            onSaved={refreshDesk}
+          />
         </TabsContent>
 
         <TabsContent value="listing" className="mt-6">
@@ -424,7 +450,6 @@ function LogLessonForm({
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [forKind, setForKind] = useState<"self" | "child">("self");
   useEffect(() => {
     if (defaultOpen || defaultPlayerId) setOpen(true);
   }, [defaultOpen, defaultPlayerId]);
@@ -453,13 +478,13 @@ function LogLessonForm({
     <Card>
       <h2 className="font-display text-xl">Log a lesson</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        For students you already coach. You are a player too — select yourself and
-        this lesson also lands on Today and Your lessons. Confirmed as soon as you
-        save it. Recurring weeks go on both calendars.
+        Pick a real student. Add them above if they are not listed yet. You are a
+        player too — select yourself and this lesson also lands on Today. Confirmed
+        as soon as you save it.
       </p>
-      {people.length === 0 ? (
+      {people.length <= 1 ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          No roster or directory student yet. A completed lesson&apos;s player can be logged again.
+          No student profile yet. Add one, then they show up here.
         </p>
       ) : null}
       <form
@@ -476,15 +501,14 @@ function LogLessonForm({
             duration_min: Number(f.get("duration_min")),
             court_id: f.get("court_id") ? Number(f.get("court_id")) : undefined,
             notes: String(f.get("notes") || "") || undefined,
+            private_notes: String(f.get("private_notes") || "") || undefined,
             service_id: serviceId,
             recur_weeks: Number(f.get("recur_weeks") || 1),
             group_spots: f.get("group_spots") ? Number(f.get("group_spots")) : undefined,
-            for_kind: forKind,
-            for_name: forKind === "child" ? String(f.get("for_name") || "").trim() : undefined,
           });
         }}
       >
-        <Field label="Student (the parent if this is for a kid)">
+        <Field label="Student">
           <Select name="player_user_id" required defaultValue={defaultPlayerId ?? ""}>
             <option value="">Select</option>
             {people.map((p) => (
@@ -494,21 +518,6 @@ function LogLessonForm({
             ))}
           </Select>
         </Field>
-        <Field label="Who plays">
-          <Select
-            name="for_kind"
-            value={forKind}
-            onChange={(e) => setForKind(e.target.value === "child" ? "child" : "self")}
-          >
-            <option value="self">The student</option>
-            <option value="child">Their child</option>
-          </Select>
-        </Field>
-        {forKind === "child" ? (
-          <Field label="Child's first name">
-            <Input name="for_name" required placeholder="First name" />
-          </Field>
-        ) : null}
         {services.length > 0 ? (
           <Field label="Service">
             <Select name="service_id" defaultValue={String(services[0]!.id)}>
@@ -562,6 +571,10 @@ function LogLessonForm({
         <Field label="Group spots (optional)">
           <Input name="group_spots" type="number" min={1} max={16} placeholder="Leave blank for private" />
         </Field>
+        <Field label={PRIVATE_NOTE_LABEL}>
+          <Textarea name="private_notes" placeholder="Footwork is late. Only you see this." />
+          <p className="text-xs text-muted-foreground">{PRIVATE_NOTE_HELP}</p>
+        </Field>
         <Field label={LESSON_NOTES_LABEL}>
           <Textarea name="notes" placeholder="Third shot. Ten resets this week before Thursday." />
           <p className="text-xs text-muted-foreground">{LESSON_NOTES_HELP}</p>
@@ -576,6 +589,134 @@ function LogLessonForm({
         </div>
       </form>
     </Card>
+  );
+}
+
+function StudentsPanel({
+  students,
+  onSaved,
+}: {
+  students: {
+    user_id: string;
+    display_name: string;
+    claim_code: string | null;
+    claimed: boolean;
+  }[];
+  onSaved: () => void;
+}) {
+  const save = useMutation({
+    mutationFn: (display_name: string) => createStudent({ data: { display_name } }),
+    onSuccess: (row) => {
+      toast.success(`${row.display_name} is a student. Copy the claim link.`);
+      onSaved();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card>
+      <h2 className="font-display text-xl">Students</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Add the person before they have an account. The schedule lists that profile.
+        One link lets a parent claim them.
+      </p>
+      <form
+        className="mt-4 flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const name = String(new FormData(e.currentTarget).get("display_name") || "").trim();
+          if (!name) return;
+          save.mutate(name);
+          e.currentTarget.reset();
+        }}
+      >
+        <Field label="New student">
+          <Input name="display_name" required placeholder="Kaia" />
+        </Field>
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? "Saving…" : "Add student"}
+        </Button>
+      </form>
+      <ul className="mt-4 flex flex-col gap-3">
+        {students.length === 0 ? (
+          <li className="text-sm text-muted-foreground">No students yet.</li>
+        ) : (
+          students.map((student) => (
+            <li key={student.user_id} className="rounded-md border border-border px-3 py-2">
+              <p className="text-sm">
+                {student.display_name}
+                <span className="text-muted-foreground">
+                  {student.claimed ? " · claimed" : " · waiting on a parent"}
+                </span>
+              </p>
+              {student.claim_code ? (
+                <CopyClaimLink code={student.claim_code} name={student.display_name} />
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">Connected from a lesson or invite.</p>
+              )}
+            </li>
+          ))
+        )}
+      </ul>
+    </Card>
+  );
+}
+
+function HouseholdPanel({
+  childrenRows,
+  coaches,
+  courts,
+  onSaved,
+}: {
+  childrenRows: {
+    user_id: string;
+    display_name: string;
+    city: string;
+    phone: string | null;
+    bio: string | null;
+    availability: string | null;
+    plays_tennis: boolean;
+    plays_pickleball: boolean;
+    tennis_level: string | null;
+    pickleball_level: string | null;
+    dupr: string | null;
+    utr: string | null;
+    experience: string | null;
+    public_fields: string[];
+    coach_user_ids: string[];
+  }[];
+  coaches: { user_id: string; display_name: string }[];
+  courts: { id: number; name: string }[];
+  onSaved: () => void;
+}) {
+  return (
+    <section className="mt-10">
+      <h2 className="font-display text-2xl">Your children</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Your account can hold more than one child. Finish a profile here, then schedule the next lesson.
+        Coach notes stay on the coach desk.
+      </p>
+      <Card className="mt-3">
+        <RegisterChildForm onSaved={onSaved} />
+        {childrenRows.map((child) => (
+          <div key={child.user_id} className="mt-6 border-t border-border pt-4">
+            <h3 className="font-display text-xl">{child.display_name}</h3>
+            <FinishStudentForm child={child} onSaved={onSaved} />
+          </div>
+        ))}
+        {childrenRows.length > 0 ? (
+          <div className="mt-6 border-t border-border pt-4">
+            <h3 className="font-display text-xl">Schedule the next lesson</h3>
+            <ScheduleChildForm
+              children={childrenRows}
+              coaches={coaches}
+              courts={courts}
+              onSaved={onSaved}
+            />
+          </div>
+        ) : null}
+      </Card>
+    </section>
   );
 }
 

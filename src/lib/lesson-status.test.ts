@@ -32,6 +32,9 @@ describe("safeAppNext", () => {
     assert.equal(safeAppNext("https://evil.example/app"), undefined);
     assert.equal(safeAppNext("//evil.example"), undefined);
     assert.equal(safeAppNext("/login"), undefined);
+    assert.equal(safeAppNext("/claim/abc123def4567890abcd"), "/claim/abc123def4567890abcd");
+    assert.equal(safeAppNext("/claim/short"), undefined);
+    assert.equal(safeAppNext("/claim/../secret"), undefined);
   });
 });
 

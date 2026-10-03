@@ -9,6 +9,8 @@ import {
   LESSON_NOTES_MAX,
 } from "@/lib/lesson-notes";
 import { saveLessonNotes } from "@/lib/rally-server";
+import { savePrivateLessonNotes } from "@/lib/students-server";
+import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL } from "@/lib/students";
 
 export function LessonNotesRead({ notes }: { notes: string | null }) {
   return (
@@ -67,6 +69,53 @@ export function LessonNotesEditor({
       <div>
         <Button type="submit" size="sm" disabled={save.isPending}>
           {save.isPending ? "Saving…" : "Save notes"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function PrivateNotesEditor({
+  lessonId,
+  notes,
+  onSaved,
+}: {
+  lessonId: number;
+  notes: string | null;
+  onSaved?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [value, setValue] = useState(notes ?? "");
+  const save = useMutation({
+    mutationFn: (next: string) => savePrivateLessonNotes({ data: { id: lessonId, notes: next } }),
+    onSuccess: () => {
+      toast.success("Private note saved.");
+      void qc.invalidateQueries({ queryKey: ["desk"] });
+      void qc.invalidateQueries({ queryKey: ["lesson-scan", lessonId] });
+      onSaved?.();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <form
+      className="grid gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate(value);
+      }}
+    >
+      <p className="text-xs tracking-widest text-muted-foreground uppercase">{PRIVATE_NOTE_LABEL}</p>
+      <p className="text-xs text-muted-foreground">{PRIVATE_NOTE_HELP}</p>
+      <Textarea
+        value={value}
+        maxLength={LESSON_NOTES_MAX}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Footwork is late. Do not send this home."
+      />
+      <div>
+        <Button type="submit" size="sm" disabled={save.isPending}>
+          {save.isPending ? "Saving…" : "Save private note"}
         </Button>
       </div>
     </form>

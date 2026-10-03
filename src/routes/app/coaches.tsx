@@ -27,6 +27,7 @@ import { lessonStatusLabel } from "@/lib/lesson-status";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
 import { listCoaches, listMyLessons, requestLesson } from "@/lib/rally-server";
+import { listHousehold } from "@/lib/students-server";
 
 type Fit = "all" | "beginner" | "stalled" | "juniors";
 
@@ -42,6 +43,7 @@ function Coaches() {
   const { fit } = Route.useSearch();
   const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => listCoaches() });
   const lessons = useQuery({ queryKey: ["my-lessons"], queryFn: () => listMyLessons() });
+  const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
 
   const filtered = useMemo(() => {
     const list = coaches.data ?? [];
@@ -142,7 +144,13 @@ function Coaches() {
           </Card>
         ) : null}
         {filtered.map((c) => (
-          <CoachRow key={c.user_id} coach={c} mine={c.user_id === profile.user_id} courts={courts} />
+          <CoachRow
+            key={c.user_id}
+            coach={c}
+            mine={c.user_id === profile.user_id}
+            courts={courts}
+            childrenRows={household.data?.children ?? []}
+          />
         ))}
       </div>
     </div>
@@ -153,10 +161,12 @@ function CoachRow({
   coach: c,
   mine,
   courts,
+  childrenRows,
 }: {
   coach: CoachCard;
   mine: boolean;
   courts: Court[];
+  childrenRows: { user_id: string; display_name: string }[];
 }) {
   return (
     <Card>
@@ -219,16 +229,26 @@ function CoachRow({
           ) : null}
           {!mine ? <ReviewBlock subjectType="coach" subjectId={c.user_id} noun={c.display_name} /> : null}
         </div>
-        {!mine && c.accepting ? <BookDialog coach={c} courts={courts} /> : null}
+        {!mine && c.accepting ? (
+          <BookDialog coach={c} courts={courts} childrenRows={childrenRows} />
+        ) : null}
       </div>
     </Card>
   );
 }
 
-function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
+function BookDialog({
+  coach,
+  courts,
+  childrenRows,
+}: {
+  coach: CoachCard;
+  courts: Court[];
+  childrenRows: { user_id: string; display_name: string }[];
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [forKind, setForKind] = useState<"self" | "child">("self");
+  const [playerId, setPlayerId] = useState("me");
   const tennisCourt = courts.find(
     (c) => c.status === "open" && !c.is_other && c.sports.includes("tennis"),
   );
@@ -259,9 +279,9 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
             const f = new FormData(e.currentTarget);
             const serviceId = f.get("service_id") ? Number(f.get("service_id")) : undefined;
             const svc = coach.services.find((s) => s.id === serviceId);
-            const child = String(f.get("for_name") || "").trim();
             book.mutate({
               coach_user_id: coach.user_id,
+              player_user_id: playerId === "me" ? undefined : playerId,
               sport: (svc?.sport as "pickleball" | "tennis") || (String(f.get("sport")) as "pickleball" | "tennis"),
               starts_at: String(f.get("starts_at")),
               duration_min: Number(f.get("duration_min")),
@@ -269,8 +289,6 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
               notes: String(f.get("notes") || "") || undefined,
               service_id: serviceId,
               recur_weeks: Number(f.get("recur_weeks") || 1),
-              for_kind: forKind,
-              for_name: forKind === "child" ? child : undefined,
             });
           }}
         >
@@ -296,21 +314,20 @@ function BookDialog({ coach, courts }: { coach: CoachCard; courts: Court[] }) {
           )}
           <div className="flex flex-col gap-1.5">
             <Label>Who is this lesson for?</Label>
-            <Select
-              name="for_kind"
-              value={forKind}
-              onChange={(e) => setForKind(e.target.value === "child" ? "child" : "self")}
-            >
-              <option value="self">Me</option>
-              <option value="child">My child</option>
+            <Select name="player_id" value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
+              <option value="me">Me</option>
+              {childrenRows.map((child) => (
+                <option key={child.user_id} value={child.user_id}>
+                  {child.display_name}
+                </option>
+              ))}
             </Select>
+            {childrenRows.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Register a child on the desk if this lesson is for them. A typed name is not a profile.
+              </p>
+            ) : null}
           </div>
-          {forKind === "child" ? (
-            <div className="flex flex-col gap-1.5">
-              <Label>Child's first name</Label>
-              <Input name="for_name" required placeholder="First name" />
-            </div>
-          ) : null}
           <div className="flex flex-col gap-1.5">
             <Label>When</Label>
             <Input name="starts_at" type="datetime-local" required />

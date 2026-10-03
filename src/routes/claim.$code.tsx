@@ -62,6 +62,10 @@ function ClaimPage() {
         <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Claim a student</p>
         {lookup.isPending ? (
           <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+        ) : lookup.isError ? (
+          <p className="mt-4 text-sm text-destructive">
+            {lookup.error instanceof Error ? lookup.error.message : "Could not open this claim link."}
+          </p>
         ) : !student ? (
           <>
             <h1 className="mt-2 font-display text-4xl">This link is not valid</h1>

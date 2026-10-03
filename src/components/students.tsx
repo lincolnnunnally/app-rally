@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -47,7 +48,13 @@ export function CopyClaimLink({ code, name }: { code: string; name: string }) {
 
   return (
     <div className="mt-2">
-      <p className="break-all font-mono text-xs text-muted-foreground">{url}</p>
+      <Link
+        to="/claim/$code"
+        params={{ code }}
+        className="break-all font-mono text-xs text-muted-foreground underline"
+      >
+        {url}
+      </Link>
       <Button className="mt-2" type="button" size="sm" variant="secondary" onClick={() => void copy()}>
         {copied ? "Copied" : "Copy claim link"}
       </Button>

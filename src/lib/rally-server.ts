@@ -32,6 +32,8 @@ import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
+import { coachStudents, connectCoach, resolveScheduledPlayer } from "@/lib/students-server";
+import { applyPublicMask, isAccountlessStudent, parseCoachIds, parsePublicFields, privateNotesForViewer, publicFieldsToText } from "@/lib/students";
 
 export type { ReviewRow };
 
@@ -770,11 +772,26 @@ function mapProfile(r: Record<string, unknown>): Profile {
 		credit_cents: num(r.credit_cents ?? 0),
 		photo_data: r.photo_data == null ? null : String(r.photo_data),
 		certs: parseCerts(r.certs_json),
-		honors: parseHonors(r.honors_json)
+		honors: parseHonors(r.honors_json),
+		guardian_user_id: r.guardian_user_id == null ? null : String(r.guardian_user_id),
+		claim_code: r.claim_code == null ? null : String(r.claim_code),
+		coach_user_ids: parseCoachIds(r.coach_user_ids),
+		public_fields: parsePublicFields(r.public_fields)
 	};
 }
 function publicOf(p: Profile): PublicProfile {
-	const { phone: _phone, credit_cents: _c, referred_by: _r, share_code: _s, ...rest } = p;
+	const masked = applyPublicMask(p, publicFieldsToText(p.public_fields));
+	const {
+		phone: _phone,
+		credit_cents: _c,
+		referred_by: _r,
+		share_code: _s,
+		guardian_user_id: _g,
+		claim_code: _claim,
+		coach_user_ids: _coaches,
+		public_fields: _fields,
+		...rest
+	} = masked;
 	return rest;
 }
 export const bootstrap = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
@@ -1024,6 +1041,7 @@ export const saveProfile = createServerFn({ method: "POST" }).middleware([authMi
           looking_for_partners = true
         where user_id = ${context.userId}
       `;
+			await connectCoach(sql, context.userId, coachId);
 			const joiner = await sql`
         select display_name from profiles where user_id = ${context.userId} limit 1
       `;
@@ -1054,6 +1072,7 @@ export const listPartners = createServerFn({ method: "GET" }).middleware([authMi
       where p.onboarded = true and p.looking_for_partners = true
         and p.user_id <> ${context.userId}
         and p.user_id not like 'seed:%'
+        and p.user_id not like 'student:%'
       order by p.display_name
     `).map((r) => publicOf(mapProfile(r)));
 });
@@ -1062,7 +1081,8 @@ export const listDirectory = createServerFn({ method: "GET" }).middleware([authM
 	await ensureSeed(sql);
 	return (await sql`
       select * from profiles
-      where onboarded = true and user_id <> ${context.userId} and user_id not like 'seed:%'
+      where onboarded = true and user_id <> ${context.userId}
+        and user_id not like 'seed:%' and user_id not like 'student:%'
       order by display_name
     `).map((r) => publicOf(mapProfile(r)));
 });
@@ -1258,7 +1278,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	await ensureSeed(sql);
 	const rows = await sql`
       select p.user_id, p.display_name, p.city, p.bio, p.plays_tennis, p.plays_pickleball,
-             p.photo_data, p.certs_json, p.honors_json,
+             p.photo_data, p.certs_json, p.honors_json, p.public_fields, p.availability,
              c.headline, c.philosophy, c.hourly_rate, c.certifications,
              c.offers_private, c.offers_group, c.accepting, c.years_coaching,
              c.playing_level, c.specializations, c.achievements, c.travel_radius_mi,
@@ -1281,28 +1301,30 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 	const proofs = await sql`
       select user_id, display_name, plays_tennis, plays_pickleball, pickleball_level, tennis_level,
              years_playing, dupr, utr, experience, accomplishments, coach_note, credit_coach_user_id,
-             photo_data,
+             photo_data, public_fields,
              tennis_years, pickleball_years, tennis_times, pickleball_times, tennis_frequency,
              pickleball_frequency, tennis_experience, pickleball_experience, tennis_results, pickleball_results
       from profiles
       where credit_coach_user_id is not null and onboarded = true
+        and user_id not like 'student:%'
       order by display_name
     `;
 	const byCredit = /* @__PURE__ */ new Map();
 	for (const p of proofs) {
 		const cid = String(p.credit_coach_user_id);
 		const list = byCredit.get(cid) ?? [];
-		list.push(mapProof(p));
+		list.push(mapProof(applyPublicMask(p, p.public_fields)));
 		byCredit.set(cid, list);
 	}
 	return rows.map((r) => {
 		const svc = byCoach.get(String(r.user_id)) ?? [];
 		const from = publicFromCents(svc) ?? (r.hourly_rate == null ? null : num(r.hourly_rate) * 100);
+		const masked = applyPublicMask(r, r.public_fields);
 		return {
 			user_id: String(r.user_id),
 			display_name: String(r.display_name),
 			city: String(r.city),
-			bio: r.bio == null ? null : String(r.bio),
+			bio: masked.bio == null ? null : String(masked.bio),
 			plays_tennis: bool(r.plays_tennis),
 			plays_pickleball: bool(r.plays_pickleball),
 			headline: r.headline == null ? null : String(r.headline),
@@ -1324,7 +1346,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 			services: svc,
 			from_cents: from,
 			students: byCredit.get(String(r.user_id)) ?? [],
-			photo_data: r.photo_data == null ? null : String(r.photo_data),
+			photo_data: masked.photo_data == null ? null : String(masked.photo_data),
 			certs: parseCerts(r.certs_json).length
 				? parseCerts(r.certs_json)
 				: parseCerts(r.certifications ? JSON.stringify([{ title: String(r.certifications) }]) : "[]"),
@@ -1341,6 +1363,7 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
       select * from coach_profiles where user_id = ${context.userId} limit 1
     `;
 	const lessons = await loadLessons(sql, { coach: context.userId });
+	const students = await coachStudents(sql, context.userId);
 	const roster = await sql`
       select p.user_id, p.display_name, count(*)::int as n,
              p.plays_tennis, p.plays_pickleball, p.pickleball_level, p.tennis_level, p.years_playing, p.dupr, p.utr,
@@ -1431,6 +1454,7 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
 			teaching_juniors: bool(coach[0].teaching_juniors)
 		} : null,
 		lessons,
+		students,
 		roster: roster.map((r) => mapProof(r, num(r.n))),
 		credited: credited.map((r) => mapProof(r)),
 		billing,
@@ -1540,7 +1564,7 @@ export const saveCoachPayHandles = createServerFn({ method: "POST" }).middleware
 async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): Promise<LessonRow[]> {
 	return (who.coach ? await sql`
         select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
-               l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
+               l.duration_min, l.sport, l.status, l.notes, l.private_notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
                l.for_kind, l.for_name,
                (
@@ -1574,9 +1598,22 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
         left join profiles pp on pp.user_id = l.player_user_id
         left join coach_services sv on sv.id = l.service_id
         where l.player_user_id = ${who.player}
+           or l.player_user_id in (
+             select user_id from profiles where guardian_user_id = ${who.player}
+           )
         order by l.starts_at desc
         limit 40
-      `).map(mapLesson);
+      `).map((row) => {
+		const lesson = mapLesson(row);
+		lesson.private_notes = who.coach
+			? privateNotesForViewer({
+				actorId: who.coach,
+				coachId: lesson.coach_user_id,
+				notes: lesson.private_notes,
+			})
+			: null;
+		return lesson;
+	});
 }
 
 function mapLesson(r: Record<string, unknown>): LessonRow {
@@ -1593,6 +1630,7 @@ function mapLesson(r: Record<string, unknown>): LessonRow {
 		sport: String(r.sport),
 		status: String(r.status),
 		notes: r.notes == null ? null : String(r.notes),
+		private_notes: r.private_notes == null || String(r.private_notes).trim() === "" ? null : String(r.private_notes),
 		has_video: bool(r.has_video)
 			|| (r.video_path != null && String(r.video_path).length > 0)
 			|| (r.video_data != null && String(r.video_data).length > 20),
@@ -1618,7 +1656,7 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
 	const sql = await getSql();
 	const row = (await sql`
       select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
-             l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
+             l.duration_min, l.sport, l.status, l.notes, l.private_notes, l.price_cents, l.billing, l.group_spots,
              l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
              l.for_kind, l.for_name,
              (
@@ -1639,12 +1677,26 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
     `)[0];
 	if (!row) throw new Error("Lesson not found");
 	const lesson = mapLesson(row);
-	if (context.userId !== lesson.coach_user_id && context.userId !== lesson.player_user_id) {
-		throw new Error("This lesson is not yours.");
+	let role: "coach" | "player" | "guardian" = "player";
+	if (context.userId === lesson.coach_user_id) role = "coach";
+	else if (context.userId === lesson.player_user_id) role = "player";
+	else {
+		const guardian = (await sql`
+      select guardian_user_id from profiles where user_id = ${lesson.player_user_id} limit 1
+    `)[0];
+		if (!guardian || String(guardian.guardian_user_id ?? "") !== context.userId) {
+			throw new Error("This lesson is not yours.");
+		}
+		role = "guardian";
 	}
+	lesson.private_notes = privateNotesForViewer({
+		actorId: context.userId,
+		coachId: lesson.coach_user_id,
+		notes: lesson.private_notes,
+	});
 	return {
 		lesson,
-		role: context.userId === lesson.coach_user_id ? "coach" as const : "player" as const,
+		role,
 		player_video: showsPlayerLessonVideo({
 			actorId: context.userId,
 			playerId: lesson.player_user_id,
@@ -1667,11 +1719,17 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	notes: z.string().max(LESSON_NOTES_MAX).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
+	player_user_id: z.string().min(1).max(80).optional(),
 	for_kind: z.enum(["self", "child"]).optional(),
 	for_name: z.string().trim().max(80).optional()
 })).handler(async ({ context, data }) => {
+	if ((data.for_name || "").trim() || data.for_kind === "child") {
+		throw new Error("Pick the student's profile. A loose name is not on the schedule.");
+	}
 	if (data.coach_user_id === context.userId) throw new Error("You cannot book yourself.");
 	const sql = await getSql();
+	const playerId = await resolveScheduledPlayer(sql, context.userId, data.player_user_id);
+	if (data.coach_user_id === playerId) throw new Error("You cannot book yourself.");
 	const starts = data.starts_at.replace("T", " ");
 	const priced = await priceLesson(sql, {
 		serviceId: data.service_id,
@@ -1680,9 +1738,6 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	});
 	const weeks = data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
 	const series = weeks > 1 ? crypto.randomUUID() : null;
-	const forKind = data.for_kind === "child" ? "child" : "self";
-	const forName = forKind === "child" ? (data.for_name || "").trim() || null : null;
-	if (forKind === "child" && !forName) throw new Error("Add the child's first name.");
 	for (let i = 0; i < weeks; i += 1) {
 		const when = i === 0 ? starts : addDays(starts, i * 7);
 		await sql`
@@ -1691,18 +1746,19 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
           service_id, price_cents, billing, series_id, facility_fee_cents, facility_cut_cents,
           for_kind, for_name
         ) values (
-          ${data.coach_user_id}, ${context.userId}, ${data.court_id ?? null},
+          ${data.coach_user_id}, ${playerId}, ${data.court_id ?? null},
           ${when}::timestamp, ${priced.duration}, ${data.sport}, 'requested', ${data.notes ?? null},
           ${priced.serviceId}, ${priced.price}, ${priced.billing}, ${series},
           ${priced.facilityFee}, ${priced.facilityCut},
-          ${forKind}, ${forName}
+          'self', null
         )
       `;
 	}
+	await connectCoach(sql, playerId, data.coach_user_id);
 	const who = await sql`
-      select display_name from profiles where user_id = ${context.userId} limit 1
+      select display_name from profiles where user_id = ${playerId} limit 1
     `;
-	const whoLine = forName ? `${who[0]?.display_name ?? "A parent"} for ${forName}` : (who[0]?.display_name ?? "A player");
+	const whoLine = who[0]?.display_name ?? "A player";
 	await notify(sql, data.coach_user_id, "Lesson request", `${whoLine} asked for ${data.sport}${weeks > 1 ? ` · ${weeks} weeks` : ""}.`, "/app/desk");
 	return { ok: true };
 });
@@ -1713,12 +1769,16 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	duration_min: z.coerce.number().min(30).max(180),
 	court_id: z.coerce.number().optional(),
 	notes: z.string().max(LESSON_NOTES_MAX).optional(),
+	private_notes: z.string().max(LESSON_NOTES_MAX).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
 	group_spots: z.coerce.number().min(1).max(16).optional(),
 	for_kind: z.enum(["self", "child"]).optional(),
 	for_name: z.string().trim().max(80).optional()
 })).handler(async ({ context, data }) => {
+	if ((data.for_name || "").trim() || data.for_kind === "child") {
+		throw new Error("Pick the student's profile. A loose name is not on the schedule.");
+	}
 	// Coaches are players. This account may be the student on the lesson it logs.
 	const sql = await getSql();
 	await sql`update profiles set is_coach = true, updated_at = now() where user_id = ${context.userId}`;
@@ -1726,6 +1786,10 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
       insert into coach_profiles (user_id) values (${context.userId})
       on conflict do nothing
     `;
+	const player = (await sql`
+      select user_id, display_name, guardian_user_id from profiles where user_id = ${data.player_user_id} limit 1
+    `)[0];
+	if (!player) throw new Error("Pick a student profile. A loose name is not on the schedule.");
 	const starts = data.starts_at.replace("T", " ");
 	const priced = await priceLesson(sql, {
 		serviceId: data.service_id,
@@ -1734,32 +1798,35 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	});
 	const weeks = data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
 	const series = weeks > 1 ? crypto.randomUUID() : null;
-	const forKind = data.for_kind === "child" ? "child" : "self";
-	const forName = forKind === "child" ? (data.for_name || "").trim() || null : null;
-	if (forKind === "child" && !forName) throw new Error("Add the child's first name.");
+	const privateNotes = (data.private_notes || "").trim() || null;
 	for (let i = 0; i < weeks; i += 1) {
 		const when = i === 0 ? starts : addDays(starts, i * 7);
 		await sql`
         insert into lessons (
           coach_user_id, player_user_id, court_id, starts_at, duration_min, sport, status, notes,
-          service_id, price_cents, billing, group_spots, series_id, facility_fee_cents, facility_cut_cents,
-          for_kind, for_name
+          private_notes, service_id, price_cents, billing, group_spots, series_id, facility_fee_cents,
+          facility_cut_cents, for_kind, for_name
         ) values (
           ${context.userId}, ${data.player_user_id}, ${data.court_id ?? null},
           ${when}::timestamp, ${priced.duration}, ${data.sport}, 'confirmed', ${data.notes ?? null},
+          ${privateNotes},
           ${priced.serviceId}, ${priced.price}, ${priced.billing}, ${data.group_spots ?? null}, ${series},
           ${priced.facilityFee}, ${priced.facilityCut},
-          ${forKind}, ${forName}
+          'self', null
         )
       `;
 	}
-	await notify(
-		sql,
-		data.player_user_id,
-		weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books",
-		forName ? `Your coach put a lesson for ${forName} on the board.` : "Your coach put a lesson on the board.",
-		"/app/coaches",
-	);
+	await connectCoach(sql, data.player_user_id, context.userId);
+	const playerName = String(player.display_name ?? "A student");
+	const title = weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books";
+	const body = "Your coach put a lesson on the board.";
+	if (!isAccountlessStudent(data.player_user_id)) {
+		await notify(sql, data.player_user_id, title, body, "/app/coaches");
+	}
+	const guardianId = player.guardian_user_id == null ? "" : String(player.guardian_user_id);
+	if (guardianId && guardianId !== context.userId) {
+		await notify(sql, guardianId, title, `${playerName} has a lesson on the board.`, "/app/desk");
+	}
 	return { ok: true };
 });
 export const saveLessonNotes = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({

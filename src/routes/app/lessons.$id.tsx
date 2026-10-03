@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { LessonNotesEditor, LessonNotesRead } from "@/components/lesson-notes";
+import { LessonNotesEditor, LessonNotesRead, PrivateNotesEditor } from "@/components/lesson-notes";
 import { LessonVideoEditor, LessonVideoRead } from "@/components/lesson-video";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +91,16 @@ function LessonScan() {
         {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
       </p>
 
+      {role === "coach" ? (
+        <Card className="mt-6">
+          <PrivateNotesEditor
+            key={`${l.id}:private:${l.private_notes ?? ""}`}
+            lessonId={l.id}
+            notes={l.private_notes}
+          />
+        </Card>
+      ) : null}
+
       <Card className="mt-6">
         {role === "coach" && lessonNotesEditable(l.status) ? (
           <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
@@ -99,13 +109,15 @@ function LessonScan() {
         )}
       </Card>
 
-      <Card className="mt-6">
-        {canEditVideo ? (
-          <LessonVideoEditor key={`${l.id}:video`} lessonId={l.id} hasVideo={l.has_video} />
-        ) : (
-          <LessonVideoRead lessonId={l.id} hasVideo={l.has_video} />
-        )}
-      </Card>
+      {role === "guardian" ? null : (
+        <Card className="mt-6">
+          {canEditVideo ? (
+            <LessonVideoEditor key={`${l.id}:video`} lessonId={l.id} hasVideo={l.has_video} />
+          ) : (
+            <LessonVideoRead lessonId={l.id} hasVideo={l.has_video} />
+          )}
+        </Card>
+      )}
 
       <Card className="mt-6">
         <p className="text-xs tracking-widest text-muted-foreground uppercase">Check in / check out</p>
@@ -113,7 +125,7 @@ function LessonScan() {
           Scan updates this lesson on the existing status path. Check in when you arrive. Check out
           when you are done — or pay now with the same handles.
         </p>
-        {open ? (
+        {open && role !== "guardian" ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {l.status === "confirmed" ? (
               <Button onClick={() => setStatus.mutate("checked_in")} disabled={setStatus.isPending}>

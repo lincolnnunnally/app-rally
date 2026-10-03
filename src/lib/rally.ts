@@ -77,9 +77,18 @@ const NEXT_KEY = "rally_next";
 export function safeAppNext(raw?: string | null): string | undefined {
   if (!raw) return undefined;
   const path = raw.trim();
-  if (!path.startsWith("/app")) return undefined;
-  if (path.startsWith("//") || path.includes("://")) return undefined;
-  return path;
+  if (path.startsWith("//") || path.includes("://") || path.includes("\\") || path.includes("..")) {
+    return undefined;
+  }
+  if (path.startsWith("/app")) return path;
+  const claim = path.match(/^\/claim\/([A-Za-z0-9_-]{8,64})$/);
+  if (claim) return `/claim/${claim[1]}`;
+  return undefined;
+}
+
+export function peekAppNext(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return safeAppNext(window.sessionStorage.getItem(NEXT_KEY));
 }
 
 export function rememberAppNext(path?: string | null) {
@@ -170,6 +179,10 @@ export type Profile = {
   photo_data: string | null;
   certs: CertItem[];
   honors: HonorItem[];
+  guardian_user_id: string | null;
+  claim_code: string | null;
+  coach_user_ids: string[];
+  public_fields: string[];
 };
 
 export type CertItem = {
@@ -234,7 +247,17 @@ export function honorKindLabel(kind: HonorItem["kind"]) {
   return HONOR_KINDS.find((k) => k.value === kind)?.label ?? "Title";
 }
 
-export type PublicProfile = Omit<Profile, "phone" | "credit_cents" | "referred_by" | "share_code">;
+export type PublicProfile = Omit<
+  Profile,
+  | "phone"
+  | "credit_cents"
+  | "referred_by"
+  | "share_code"
+  | "guardian_user_id"
+  | "claim_code"
+  | "coach_user_ids"
+  | "public_fields"
+>;
 
 export type SportBits = {
   plays_pickleball?: boolean;
@@ -475,6 +498,7 @@ export type LessonRow = {
   rally_take_cents: number;
   for_kind: "self" | "child";
   for_name: string | null;
+  private_notes: string | null;
 };
 
 export function lessonWho(l: Pick<LessonRow, "player_name" | "for_kind" | "for_name">) {

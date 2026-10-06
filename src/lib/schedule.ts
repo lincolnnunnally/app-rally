@@ -233,6 +233,26 @@ export function noticeTarget(actorId: string, coachId: string, playerId: string)
   return coachId;
 }
 
+/**
+ * When the player is the recipient, their guardian gets the same notice.
+ * One copy if the guardian is the player, or if the guardian is the person who acted.
+ */
+export function lessonNoticeAudience(opts: {
+  recipientId: string | null | undefined;
+  playerId: string;
+  guardianId: string | null | undefined;
+  actorId: string;
+}): string[] {
+  const recipient = (opts.recipientId ?? "").trim();
+  if (!recipient) return [];
+  const guardian = (opts.guardianId ?? "").trim();
+  const player = opts.playerId.trim();
+  if (!guardian || recipient !== player || guardian === player || guardian === opts.actorId) {
+    return [recipient];
+  }
+  return [recipient, guardian];
+}
+
 export type ScheduleNotice = {
   userId: string;
   title: string;

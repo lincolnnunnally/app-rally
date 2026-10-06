@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   addCoachId,
   applyPublicMask,
+  canCoachSchedulePlayer,
   canFinishStudent,
   childrenOf,
   claimPath,
@@ -29,6 +30,33 @@ describe("coaches and guardians", () => {
   it("connects one player to more than one coach", () => {
     const ids = addCoachId(addCoachId([], "coach-a"), "coach-b");
     assert.deepEqual(addCoachId(ids, "coach-a"), ["coach-a", "coach-b"]);
+  });
+
+  it("lets a coach schedule a rostered student or themselves", () => {
+    assert.equal(
+      canCoachSchedulePlayer({
+        coachId: "coach-a",
+        playerId: "student:kaia",
+        coachUserIds: '["coach-a","coach-b"]',
+      }),
+      true,
+    );
+    assert.equal(
+      canCoachSchedulePlayer({
+        coachId: "coach-a",
+        playerId: "coach-a",
+        coachUserIds: "[]",
+      }),
+      true,
+    );
+    assert.equal(
+      canCoachSchedulePlayer({
+        coachId: "coach-a",
+        playerId: "user-random",
+        coachUserIds: "[]",
+      }),
+      false,
+    );
   });
 
   it("lets one guardian have more than one child", () => {

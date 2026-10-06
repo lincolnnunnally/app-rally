@@ -8,6 +8,7 @@ import type { LessonRow } from "@/lib/rally";
 import {
   extendAfterLast,
   isOpenLesson,
+  lessonNoticeAudience,
   lessonTimeZone,
   moveSingleLesson,
   renewWeekCount,
@@ -22,6 +23,7 @@ import {
   type ScheduleOccurrence,
 } from "@/lib/schedule";
 import { isAccountlessStudent } from "@/lib/students";
+import { assertCoachCanSchedulePlayer } from "@/lib/students-server";
 
 const MIGRATION_HINT =
   "This scheduling action needs migration 0016_lesson_schedule.sql. It is not applied yet.";
@@ -304,17 +306,48 @@ async function materializeSeries(sql: Sql, seriesId: string) {
   }
 }
 
+export async function deliverLessonNotice(
+  sql: Sql,
+  opts: {
+    recipientId: string | null | undefined;
+    playerId: string;
+    actorId: string;
+    title: string;
+    body: string;
+    href: string;
+    mail: { kind: LessonMailKind; whenLabel: string; detail: string };
+  },
+) {
+  const guardian = await guardianId(sql, opts.playerId);
+  const recipients = lessonNoticeAudience({
+    recipientId: opts.recipientId,
+    playerId: opts.playerId,
+    guardianId: guardian,
+    actorId: opts.actorId,
+  });
+  for (const userId of recipients) {
+    await notify(sql, userId, opts.title, opts.body, opts.href);
+    await deliverLessonEmail(sql, userId, opts.mail);
+  }
+}
+
 async function mailAndNotify(
   sql: Sql,
   notice: { userId: string; title: string; body: string; href: string } | null,
   mail: { kind: LessonMailKind; whenLabel: string; detail: string },
+  playerId: string,
+  actorId: string,
 ) {
   if (!notice) return;
-  let userId = notice.userId;
-  if (isAccountlessStudent(userId)) userId = await guardianId(sql, userId);
-  if (!userId) return;
-  await notify(sql, userId, notice.title, notice.body, notice.href);
-  await deliverLessonEmail(sql, userId, mail);
+  await deliverLessonNotice(sql, {
+    recipientId: notice.userId,
+    playerId,
+    actorId,
+    title: notice.title,
+    body: notice.body,
+    href: notice.href,
+    mail,
+  });
 }
 
 export const moveLesson = createServerFn({ method: "POST" })
@@ -355,11 +388,17 @@ export const moveLesson = createServerFn({ method: "POST" })
       lessonId: occurrence.id,
       whenLabel,
     });
-    await mailAndNotify(sql, notice, {
-      kind: "reschedule",
-      whenLabel,
-      detail: "One lesson moved. Other dates in the series are unchanged.",
-    });
+    await mailAndNotify(
+      sql,
+      notice,
+      {
+        kind: "reschedule",
+        whenLabel,
+        detail: "One lesson moved. Other dates in the series are unchanged.",
+      },
+      occurrence.player_user_id,
+      context.userId,
+    );
     return { ok: true, starts_at: moved.starts_at };
   });
 
@@ -404,11 +443,17 @@ export const shiftLessonSeries = createServerFn({ method: "POST" })
         fromDate: data.from_date,
         timeLabel,
       });
-      await mailAndNotify(sql, notice, {
-        kind: "reschedule",
-        whenLabel: `${data.from_date} · ${timeLabel}`,
-        detail: "Lessons on that date and after moved. Earlier ones stayed put.",
-      });
+      await mailAndNotify(
+        sql,
+        notice,
+        {
+          kind: "reschedule",
+          whenLabel: `${data.from_date} · ${timeLabel}`,
+          detail: "Lessons on that date and after moved. Earlier ones stayed put.",
+        },
+        playerId,
+        context.userId,
+      );
     }
     return { ok: true, moved: changed.length };
   });
@@ -423,6 +468,7 @@ async function appendSeries(sql: Sql, actorId: string, seriesId: string, extraWe
     throw new Error("This standing series already keeps the next 12 weeks on the board.");
   }
   await assertCanTouch(sql, actorId, template.coach_user_id, template.player_user_id);
+  await assertCoachCanSchedulePlayer(sql, template.coach_user_id, template.player_user_id);
   const slots = extendAfterLast(
     rows.map((row) => row.cadence_at || row.starts_at),
     extraWeeks,
@@ -492,11 +538,17 @@ export const cancelCoachDay = createServerFn({ method: "POST" })
     );
     const notices = weatherCancelNotices(mapped, context.userId, data.day, reason);
     for (const notice of notices) {
-      await mailAndNotify(sql, notice, {
-        kind: "cancel",
-        whenLabel: data.day,
-        detail: reason,
-      });
+      await mailAndNotify(
+        sql,
+        notice,
+        {
+          kind: "cancel",
+          whenLabel: data.day,
+          detail: reason,
+        },
+        notice.userId,
+        context.userId,
+      );
     }
     return { ok: true, canceled: ids.length };
   });

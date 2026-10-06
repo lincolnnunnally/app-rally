@@ -30,6 +30,7 @@ import {
 } from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
+import { DISMISS_KIND } from "@/lib/daylight";
 import { STANDING_HORIZON_WEEKS, weeklyStamps } from "@/lib/schedule";
 import {
 	assertScheduleColumns,
@@ -2453,6 +2454,7 @@ export const listJournal = createServerFn({ method: "GET" }).middleware([authMid
       select id, kind, title, body, created_at::text as created_at
       from journal_entries
       where user_id = ${context.userId}
+        and kind <> ${DISMISS_KIND}
       order by created_at desc
       limit 40
     `).map((r) => ({

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql, type Sql } from "@/lib/db";
-import { sendLessonCopy, type LessonMailKind } from "@/lib/lesson-mail";
+import { lessonAbsoluteUrl, sendLessonCopy, type LessonMailPayload } from "@/lib/lesson-mail";
 import type { LessonRow } from "@/lib/rally";
 import {
   extendAfterLast,
@@ -51,13 +51,19 @@ async function notify(sql: Sql, userId: string, title: string, body: string, hre
 export async function deliverLessonEmail(
   sql: Sql,
   userId: string | null | undefined,
-  mail: { kind: LessonMailKind; whenLabel: string; detail: string },
+  mail: LessonMailPayload,
 ) {
   try {
     if (!userId || isAccountlessStudent(userId) || userId.startsWith("seed:")) return;
     const row = (await sql`select "email" from "user" where "id" = ${userId} limit 1`)[0];
     const to = row?.email == null ? "" : String(row.email);
-    await sendLessonCopy({ to, ...mail });
+    await sendLessonCopy({
+      to,
+      kind: mail.kind,
+      whenLabel: mail.whenLabel,
+      detail: mail.detail,
+      lessonUrl: lessonAbsoluteUrl(mail.lessonId),
+    });
   } catch (err) {
     console.error("[lesson-mail]", err instanceof Error ? err.message : "email failed");
   }
@@ -315,7 +321,7 @@ export async function deliverLessonNotice(
     title: string;
     body: string;
     href: string;
-    mail: { kind: LessonMailKind; whenLabel: string; detail: string };
+    mail: LessonMailPayload;
   },
 ) {
   const guardian = await guardianId(sql, opts.playerId);
@@ -334,7 +340,7 @@ export async function deliverLessonNotice(
 async function mailAndNotify(
   sql: Sql,
   notice: { userId: string; title: string; body: string; href: string } | null,
-  mail: { kind: LessonMailKind; whenLabel: string; detail: string },
+  mail: LessonMailPayload,
   playerId: string,
   actorId: string,
 ) {
@@ -399,6 +405,7 @@ export const moveLesson = createServerFn({ method: "POST" })
         kind: "reschedule",
         whenLabel,
         detail: notice?.body ?? `One lesson moved to ${whenLabel}.`,
+        lessonId: occurrence.id,
       },
       occurrence.player_user_id,
       context.userId,
@@ -457,6 +464,7 @@ export const shiftLessonSeries = createServerFn({ method: "POST" })
           kind: "reschedule",
           whenLabel,
           detail: notice?.body ?? `Lessons on ${whenLabel} and after moved.`,
+          lessonId: sample.id,
         },
         playerId,
         context.userId,
@@ -559,6 +567,7 @@ export const cancelCoachDay = createServerFn({ method: "POST" })
             mapped.find((row) => row.player_user_id === notice.userId)?.starts_at ?? `${data.day} 00:00:00`,
           ),
           detail: notice.body,
+          lessonId: mapped.find((row) => row.player_user_id === notice.userId)?.id ?? ids[0]!,
         },
         notice.userId,
         context.userId,

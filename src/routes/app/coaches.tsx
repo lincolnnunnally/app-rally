@@ -259,7 +259,7 @@ function CoachRow({
           ) : null}
           {!mine ? <ReviewBlock subjectType="coach" subjectId={c.user_id} noun={c.display_name} /> : null}
         </div>
-        {!mine && c.accepting ? (
+        {!mine ? (
           <BookDialog coach={c} courts={courts} childrenRows={childrenRows} />
         ) : null}
       </div>
@@ -298,11 +298,18 @@ function BookDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Request</Button>
+        <Button>Request a lesson</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogTitle>Request {coach.display_name}</DialogTitle>
-        <DialogDescription>Pick the service. The coach confirms. Recurring weeks stay on both calendars.</DialogDescription>
+        <DialogDescription>
+          Pick the coach&apos;s time. They confirm or decline, and you get a notice either way.
+        </DialogDescription>
+        {coach.accepting ? null : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            This coach is on a waitlist. Send the time anyway — they can still confirm.
+          </p>
+        )}
         <form
           className="mt-4 flex flex-col gap-3"
           onSubmit={(e) => {

@@ -29,8 +29,8 @@ import {
   showsPlayerLessonVideo,
 } from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
-import { canActorSetLessonStatus } from "@/lib/lesson-status";
-import { STANDING_HORIZON_WEEKS, cancelNoticeHref, formatNoticeWhen, lessonCameOff, lessonOnBoard, weeklyStamps } from "@/lib/schedule";
+import { canActorSetLessonStatus, lessonScanPath } from "@/lib/lesson-status";
+import { STANDING_HORIZON_WEEKS, cancelNoticeHref, formatNoticeWhen, lessonCameOff, lessonConfirmNotice, lessonDeclineNotice, lessonRequestNotice, weeklyStamps } from "@/lib/schedule";
 import {
 	assertScheduleColumns,
 	attachScheduleFields,
@@ -1744,7 +1744,6 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	const sql = await getSql();
 	const playerId = await resolveScheduledPlayer(sql, context.userId, data.player_user_id);
 	if (data.coach_user_id === playerId) throw new Error("You cannot book yourself.");
-	await assertCoachCanSchedulePlayer(sql, data.coach_user_id, playerId);
 	const starts = data.starts_at.replace("T", " ");
 	const priced = await priceLesson(sql, {
 		serviceId: data.service_id,
@@ -1778,17 +1777,31 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	const who = await sql`
       select display_name from profiles where user_id = ${playerId} limit 1
     `;
-	const whoLine = who[0]?.display_name ?? "A player";
+	const whoLine = who[0]?.display_name == null ? "A player" : String(who[0].display_name);
 	const coachName = await profileDisplayName(sql, data.coach_user_id, "Coach");
 	const span = openEnded ? " · standing" : weeks > 1 ? ` · ${weeks} weeks` : "";
 	const whenLabel = formatNoticeWhen(starts);
-	await notify(
-		sql,
-		data.coach_user_id,
-		"Lesson request",
-		`${whenLabel}: ${whoLine} asked ${coachName} for ${data.sport}${span}.`,
-		"/app/desk",
-	);
+	const notice = lessonRequestNotice({
+		whenLabel,
+		playerName: whoLine,
+		coachName,
+		sport: data.sport,
+		span,
+	});
+	await deliverLessonNotice(sql, {
+		recipientId: data.coach_user_id,
+		playerId,
+		actorId: context.userId,
+		title: notice.title,
+		body: notice.body,
+		href: notice.href,
+		mail: {
+			kind: "request",
+			whenLabel,
+			detail: notice.body,
+			lessonId: ids[0]!,
+		},
+	});
 	return { ok: true };
 });
 export const logLesson = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -1858,18 +1871,25 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	const coachName = await profileDisplayName(sql, context.userId, "Coach");
 	const playerName = String(player.display_name ?? "").trim() || "Player";
 	const whenLabel = formatNoticeWhen(starts);
-	const body = lessonOnBoard({ whenLabel, coachName, playerName });
+	const notice = lessonConfirmNotice({
+		lessonId: ids[0]!,
+		whenLabel,
+		coachName,
+		playerName,
+		title,
+	});
 	await deliverLessonNotice(sql, {
 		recipientId: data.player_user_id,
 		playerId: data.player_user_id,
 		actorId: context.userId,
-		title,
-		body,
-		href: "/app/coaches",
+		title: notice.title,
+		body: notice.body,
+		href: notice.href,
 		mail: {
 			kind: "confirm",
 			whenLabel,
-			detail: body,
+			detail: notice.body,
+			lessonId: ids[0]!,
 		},
 	});
 	return { ok: true };
@@ -2062,7 +2082,8 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 		"cancelled",
 		"completed",
 		"checked_in"
-	])
+	]),
+	reason: z.string().max(500).optional()
 })).handler(async ({ context, data }) => {
 	const sql = await getSql();
 	const lesson = (await sql`
@@ -2081,23 +2102,40 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 		next: data.status
 	});
 	if (!gate.ok) throw new Error(gate.error);
-	await sql`update lessons set status = ${data.status} where id = ${data.id}`;
+	const cancelReason = (data.reason ?? "").trim() || null;
+	if (data.status === "cancelled") {
+		await sql`update lessons set status = 'cancelled', cancel_reason = ${cancelReason} where id = ${data.id}`;
+	} else {
+		await sql`update lessons set status = ${data.status} where id = ${data.id}`;
+	}
 	const whenLabel = formatNoticeWhen(lesson.starts_at == null ? null : String(lesson.starts_at));
 	const coachName = await profileDisplayName(sql, coach, "Coach");
 	const playerName = await profileDisplayName(sql, player, "Player");
+	const lessonHref = lessonScanPath(data.id);
 	if (data.status === "confirmed") {
-		const detail = lessonOnBoard({ whenLabel, coachName, playerName });
+		const notice = lessonConfirmNotice({ lessonId: data.id, whenLabel, coachName, playerName });
 		await deliverLessonNotice(sql, {
 			recipientId: player,
 			playerId: player,
 			actorId: context.userId,
-			title: "Lesson confirmed",
-			body: detail,
-			href: "/app/coaches",
-			mail: { kind: "confirm", whenLabel, detail },
+			title: notice.title,
+			body: notice.body,
+			href: notice.href,
+			mail: { kind: "confirm", whenLabel, detail: notice.body, lessonId: data.id },
 		});
 	}
-	else if (data.status === "declined") await notify(sql, player, "Lesson declined", "The coach declined that time. Try another window.", "/app/coaches");
+	else if (data.status === "declined") {
+		const notice = lessonDeclineNotice({ lessonId: data.id, whenLabel, coachName, playerName });
+		await deliverLessonNotice(sql, {
+			recipientId: player,
+			playerId: player,
+			actorId: context.userId,
+			title: notice.title,
+			body: notice.body,
+			href: notice.href,
+			mail: { kind: "decline", whenLabel, detail: notice.body, lessonId: data.id },
+		});
+	}
 	else if (data.status === "checked_in") {
 		const other = context.userId === coach ? player : coach;
 		await notify(
@@ -2105,7 +2143,7 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 			other,
 			"Checked in",
 			`${lesson.sport} lesson — scanned in.`,
-			context.userId === coach ? "/app/coaches" : "/app/desk",
+			other === coach ? "/app/desk" : lessonHref,
 		);
 	}
 	else if (data.status === "completed") {
@@ -2173,16 +2211,17 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 			lessonTake = settled.take;
 		}
 		await sql`update lessons set rally_take_cents = ${(billing.plan === "monthly" ? 0 : lessonTake) + facilityTake} where id = ${data.id}`;
+		const other = context.userId === coach ? player : coach;
 		await notify(
 			sql,
-			context.userId === coach ? player : coach,
+			other,
 			"Lesson complete",
 			"Pay on Cash App or Venmo — same handles as the coach desk Books.",
-			context.userId === coach ? "/app/coaches" : "/app/desk",
+			other === coach ? "/app/desk" : lessonHref,
 		);
 	} else if (data.status === "cancelled") {
 		const other = context.userId === coach ? player : coach;
-		const detail = lessonCameOff({ whenLabel, coachName, playerName });
+		const detail = lessonCameOff({ whenLabel, coachName, playerName, reason: cancelReason });
 		await deliverLessonNotice(sql, {
 			recipientId: other,
 			playerId: player,
@@ -2190,7 +2229,7 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 			title: "Lesson cancelled",
 			body: detail,
 			href: cancelNoticeHref(other, coach, data.id),
-			mail: { kind: "cancel", whenLabel, detail },
+			mail: { kind: "cancel", whenLabel, detail, lessonId: data.id },
 		});
 	}
 	return { ok: true };

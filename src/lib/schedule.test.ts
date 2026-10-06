@@ -8,8 +8,11 @@ import {
   cancelNoticeHref,
   formatNoticeWhen,
   lessonCameOff,
+  lessonConfirmNotice,
+  lessonDeclineNotice,
   lessonNoticeAudience,
   lessonOnBoard,
+  lessonRequestNotice,
   moveSingleLesson,
   noticeTarget,
   offsetMinutes,
@@ -206,6 +209,39 @@ describe("schedule notices", () => {
       lessonCameOff({ whenLabel: "Tue, Oct 27, 5:30 PM", coachName: "Coach Sam", playerName: "Kaia" }),
       "Tue, Oct 27, 5:30 PM with Coach Sam for Kaia came off the board.",
     );
+    assert.equal(
+      lessonCameOff({
+        whenLabel: "Mon, Jan 25, 10:00 AM",
+        coachName: "Coach Sam",
+        playerName: "Kaia",
+        reason: "Rain day",
+      }),
+      "Mon, Jan 25, 10:00 AM with Coach Sam for Kaia came off the board. Rain day",
+    );
+    const requested = lessonRequestNotice({
+      whenLabel: "Mon, Jan 25, 10:00 AM",
+      playerName: "Kaia",
+      coachName: "Coach Sam",
+      sport: "tennis",
+      span: " · recurring",
+    });
+    assert.equal(requested.href, "/app/desk");
+    assert.match(requested.body, /Kaia asked Coach Sam for tennis/);
+    const confirmed = lessonConfirmNotice({
+      lessonId: 32,
+      whenLabel: "Mon, Jan 25, 10:00 AM",
+      coachName: "Coach Sam",
+      playerName: "Kaia",
+    });
+    assert.equal(confirmed.href, "/app/lessons/32");
+    assert.doesNotMatch(confirmed.href, /coaches/);
+    const declined = lessonDeclineNotice({
+      lessonId: 32,
+      whenLabel: "Mon, Jan 25, 10:00 AM",
+      coachName: "Coach Sam",
+      playerName: "Kaia",
+    });
+    assert.equal(declined.href, "/app/lessons/32");
     assert.equal(cancelNoticeHref(player, coach, 34), "/app/lessons/34");
     assert.equal(cancelNoticeHref("guardian-1", coach, 34), "/app/lessons/34");
     assert.equal(cancelNoticeHref(coach, coach, 34), "/app/desk");

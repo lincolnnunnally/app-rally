@@ -31,6 +31,7 @@ function refreshSchedule(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ["home"] });
   void qc.invalidateQueries({ queryKey: ["notices"] });
   void qc.invalidateQueries({ queryKey: ["lesson-scan"] });
+  void qc.invalidateQueries({ queryKey: ["week-lessons"] });
 }
 
 export function LessonScheduleActions({ lesson }: { lesson: LessonRow }) {

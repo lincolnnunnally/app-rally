@@ -21,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
+import { CalendarSubscribeCard } from "@/components/calendar-subscribe";
+import { LessonWeek } from "@/components/lesson-week";
 import { LessonNotesRead } from "@/components/lesson-notes";
 import { LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoRead } from "@/components/lesson-video";
@@ -78,9 +80,21 @@ function Coaches() {
         both calendars.
       </p>
 
+      <div className="mt-8 flex flex-col gap-6">
+        <div>
+          <h2 className="font-display text-2xl">Your lessons</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your lessons and your students' lessons. Open one to move it. Notes and practice video
+            stay on the list below.
+          </p>
+        </div>
+        <LessonWeek perspective="player" viewerId={profile.user_id} />
+        <CalendarSubscribeCard />
+      </div>
+
       {(lessons.data ?? []).length > 0 ? (
         <div className="mt-8">
-          <h2 className="font-display text-2xl">Your lessons</h2>
+          <h2 className="font-display text-2xl">Lesson notes</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Session notes and the weekly practice cue from your coach. Same field as the desk.
             Practice video lives on the same lesson.
@@ -263,6 +277,7 @@ function BookDialog({
       setOpen(false);
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
+      void qc.invalidateQueries({ queryKey: ["week-lessons"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

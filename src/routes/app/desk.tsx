@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
+import { CalendarSubscribeCard } from "@/components/calendar-subscribe";
+import { LessonWeek } from "@/components/lesson-week";
 import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
 import { CancelLessonButton, LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
 import {
@@ -74,6 +76,7 @@ function Desk() {
       void qc.invalidateQueries({ queryKey: ["desk"] });
       void qc.invalidateQueries({ queryKey: ["home"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
+      void qc.invalidateQueries({ queryKey: ["week-lessons"] });
       const lesson = (desk.data?.lessons ?? []).find((l) => l.id === vars.id);
       if (vars.status === "completed" && lesson) setPayFor(lesson);
       toast.success(vars.status === "checked_in" ? "Checked in." : vars.status === "completed" ? "Checked out." : "Updated.");
@@ -89,6 +92,7 @@ function Desk() {
     void qc.invalidateQueries({ queryKey: ["my-lessons"] });
     void qc.invalidateQueries({ queryKey: ["notices"] });
     void qc.invalidateQueries({ queryKey: ["household"] });
+    void qc.invalidateQueries({ queryKey: ["week-lessons"] });
   };
 
   const upcoming = (desk.data?.lessons ?? []).filter((l) => lessonIsOpen(l.status));
@@ -134,6 +138,11 @@ function Desk() {
           </p>
         </Card>
       ) : null}
+
+      <div className="mt-8 flex flex-col gap-6">
+        <LessonWeek perspective="coach" viewerId={profile.user_id} />
+        <CalendarSubscribeCard />
+      </div>
 
       <Tabs defaultValue="board" className="mt-8">
         <TabsList>

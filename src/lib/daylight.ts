@@ -57,7 +57,16 @@ export type DismissedSuggestion = {
 
 export type SeasonSuggestion = {
   seriesId: string;
+  /** First upcoming dark occurrence. Confirm still shifts from this date. */
   fromDate: string;
+  /**
+   * Stable key for daylight_dismissals.lesson_date.
+   * That column stores this shift anchor, not an occurrence date, so the
+   * existing primary key (series_id, lesson_date, user_id) can hide a shift
+   * without a new column. The same clocks stay hidden next week. A new
+   * suggested clock is a new anchor and shows again.
+   */
+  anchorDate: string;
   /** HH:MM for the existing shift-series action. */
   localTime: string;
   message: string;
@@ -65,6 +74,21 @@ export type SeasonSuggestion = {
   locationFallback: boolean;
   reason: "after-dark" | "before-sunrise" | "outside";
 };
+
+/**
+ * Encode the current wall clock and the suggested wall clock as one civil date.
+ * daylight_dismissals.lesson_date stores this value. It is not a lesson date.
+ */
+export function shiftAnchorDate(currentMin: number, nextMin: number): string {
+  const current = Math.max(0, Math.min(1439, Math.round(currentMin)));
+  const next = Math.max(0, Math.min(1439, Math.round(nextMin)));
+  const dayIndex = current * 1440 + next;
+  const dt = new Date(Date.UTC(2000, 0, 1) + dayIndex * 86_400_000);
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(dt.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 export type SeasonShiftData = {
   series_id: string;
@@ -404,7 +428,6 @@ export function buildSeasonSuggestions(opts: {
     dark.sort((a, b) => cadenceDate(a.row).localeCompare(cadenceDate(b.row)));
     const first = dark[0]!;
     const fromDate = cadenceDate(first.row);
-    if (hidden.has(`${seriesId}|${fromDate}`)) continue;
     const startMin = first.startMin;
     const durationMin = first.row.durationMin;
     const windows = dark.map((item) => item.solar);
@@ -412,9 +435,12 @@ export function buildSeasonSuggestions(opts: {
     if (!reason) continue;
     const nextMin = suggestWallMinutes(startMin, durationMin, windows);
     if (nextMin == null) continue;
+    const anchorDate = shiftAnchorDate(startMin, nextMin);
+    if (hidden.has(`${seriesId}|${anchorDate}`)) continue;
     suggestions.push({
       seriesId,
       fromDate,
+      anchorDate,
       localTime: formatLocalTime(nextMin),
       message: suggestionMessage({ fromDate, currentMin: startMin, nextMin, reason }),
       playerName: first.row.playerName,

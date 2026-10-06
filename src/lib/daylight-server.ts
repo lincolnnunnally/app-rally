@@ -67,6 +67,7 @@ async function readDismissals(sql: Sql, userId: string): Promise<DismissedSugges
     `;
     return rows.map((row) => ({
       seriesId: String(row.series_id),
+      // lesson_date holds the shift anchor from shiftAnchorDate, not an occurrence date.
       fromDate: String(row.lesson_date).slice(0, 10),
     }));
   } catch (err) {
@@ -126,6 +127,7 @@ export const dismissSeasonSuggestion = createServerFn({ method: "POST" })
       values (${data.series_id}, ${data.from_date}::date, ${context.userId})
       on conflict (series_id, lesson_date, user_id) do nothing
     `;
+    // from_date is the shift anchor (see shiftAnchorDate). The column stays lesson_date.
     return { ok: true };
   });
 

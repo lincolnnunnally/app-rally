@@ -116,6 +116,11 @@ function Desk() {
   const [logPlayerId, setLogPlayerId] = useState<string | undefined>();
   const [weatherDay, setWeatherDay] = useState<string | undefined>();
 
+  useEffect(() => {
+    if (!weatherDay) return;
+    document.getElementById("weather-day-input")?.focus();
+  }, [weatherDay]);
+
   return (
     <div className="px-5 py-8">
       <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Coach desk</p>
@@ -195,12 +200,7 @@ function Desk() {
               Cancel every open lesson you have on one day. They stay on the board as canceled,
               with the reason. Other coaches are left alone. Players get a notice.
             </p>
-            <WeatherHeadsUp
-              onPickDay={(day) => {
-                setWeatherDay(day);
-                document.getElementById("weather-day-input")?.focus();
-              }}
-            />
+            <WeatherHeadsUp onPickDay={setWeatherDay} />
             <WeatherCancelForm day={weatherDay} />
           </section>
 

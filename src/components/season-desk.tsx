@@ -43,7 +43,7 @@ export function SeasonSuggestionsCard() {
   const dismiss = useMutation({
     mutationFn: (suggestion: SeasonSuggestion) =>
       dismissSeasonSuggestion({
-        data: { series_id: suggestion.seriesId, from_date: suggestion.fromDate },
+        data: { series_id: suggestion.seriesId, from_date: suggestion.anchorDate },
       }),
     onSuccess: () => {
       toast.success("Suggestion hidden.");

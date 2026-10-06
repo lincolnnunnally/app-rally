@@ -10,6 +10,7 @@ import {
   lessonForecastFlag,
   parseDismissals,
   seasonShiftData,
+  shiftAnchorDate,
   solarTimesOn,
   startsWithinHours,
   suggestWallMinutes,
@@ -146,14 +147,48 @@ describe("season suggestion rule", () => {
       }),
       [],
     );
+    const shown = buildSeasonSuggestions({ rows: evening, dismissed: [], now });
+    assert.equal(shown.length, 1);
+    assert.notEqual(shown[0]!.anchorDate, "2026-10-27");
+    assert.equal(shown[0]!.anchorDate, shiftAnchorDate(17 * 60 + 30, 16 * 60));
     assert.deepEqual(
       buildSeasonSuggestions({
         rows: evening,
-        dismissed: [{ seriesId: "series-tuesday-1730", fromDate: "2026-10-27" }],
+        dismissed: [{ seriesId: "series-tuesday-1730", fromDate: shown[0]!.anchorDate }],
         now,
       }),
       [],
     );
+    assert.equal(
+      buildSeasonSuggestions({
+        rows: evening,
+        dismissed: [{ seriesId: "series-tuesday-1730", fromDate: "2026-10-27" }],
+        now,
+      }).length,
+      1,
+    );
+  });
+
+  it("hides next week's same shift and shows a new season's shift", () => {
+    const evening = tuesdays.map((date) => slot(date, "17:30:00"));
+    const first = buildSeasonSuggestions({ rows: evening, dismissed: [], now });
+    const anchor = first[0]!.anchorDate;
+    const nextWeek = buildSeasonSuggestions({
+      rows: evening.filter((row) => row.startsAt >= "2026-11-03"),
+      dismissed: [{ seriesId: "series-tuesday-1730", fromDate: anchor }],
+      now: new Date("2026-11-03T15:00:00Z"),
+    });
+    assert.equal(nextWeek.length, 0);
+
+    const morning = buildSeasonSuggestions({
+      rows: [slot("2026-11-03", "06:30:00")],
+      dismissed: [{ seriesId: "series-tuesday-1730", fromDate: anchor }],
+      now,
+    });
+    assert.equal(morning.length, 1);
+    assert.equal(morning[0]!.reason, "before-sunrise");
+    assert.notEqual(morning[0]!.anchorDate, anchor);
+    assert.equal(morning[0]!.anchorDate, shiftAnchorDate(6 * 60 + 30, 7 * 60 + 30));
   });
 
   it("shifts a lesson that starts before sunrise plus 15 minutes later in the morning", () => {
@@ -190,6 +225,7 @@ describe("confirm season shift", () => {
     const suggestion: SeasonSuggestion = {
       seriesId: "series-tuesday-1730",
       fromDate: "2026-11-03",
+      anchorDate: shiftAnchorDate(17 * 60 + 30, 16 * 60 + 30),
       localTime: "16:30",
       message: "Starting Nov 3, your Tue 5:30 PM series ends after dark. Shift to 4:30 PM from Nov 3?",
       playerName: "Avery",

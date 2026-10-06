@@ -11,6 +11,7 @@ import { CertEditor, HonorEditor, ProofDisplay } from "@/components/proof-lists"
 import {
   LEVELS,
   PLAY_FREQUENCY,
+  clearCoach,
   readCoach,
   readRef,
   type CertItem,
@@ -144,6 +145,7 @@ export function Onboarding({
           honors,
         },
       });
+      clearCoach();
       onDone(profile);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save.");

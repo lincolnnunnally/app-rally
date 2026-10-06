@@ -41,7 +41,6 @@ export type FeedLesson = {
   timezone: string | null;
   updatedAt: string | null;
   createdAt: string | null;
-  notes: string | null;
 };
 
 export type CalendarFeed = {
@@ -409,7 +408,7 @@ export function calendarFeedHttp(input: {
   };
 }
 
-/** Copy only fields the calendar is allowed to show. Private notes, phone, and email are not read. */
+/** Copy only fields the calendar is allowed to show. Typed notes, private notes, journal text, phone, and email are not read. */
 export function toFeedLesson(row: Record<string, unknown>): FeedLesson {
   return {
     id: numberValue(row.id),
@@ -428,7 +427,6 @@ export function toFeedLesson(row: Record<string, unknown>): FeedLesson {
     timezone: textOrNull(row.timezone),
     updatedAt: textOrNull(row.updated_at ?? row.updatedAt),
     createdAt: textOrNull(row.created_at ?? row.createdAt),
-    notes: textOrNull(row.notes),
   };
 }
 
@@ -482,7 +480,6 @@ function descriptionFor(lesson: FeedLesson): string {
   if (lesson.status === "cancelled") {
     lines.push(`Canceled: ${(lesson.cancelReason ?? "").trim() || "Canceled."}`);
   }
-  if (lesson.notes) lines.push(`Notes: ${lesson.notes}`);
   return lines.join("\n");
 }
 

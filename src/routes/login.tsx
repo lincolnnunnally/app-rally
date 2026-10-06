@@ -8,7 +8,7 @@ import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } fr
 import { rallyResetRedirect } from "@/lib/auth/reset-redirect";
 import { runEmailSignIn } from "@/lib/auth/sign-in-outcome";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { consumeAppNext, peekAppNext, rememberCoach, rememberRef } from "@/lib/rally";
+import { applyLoginCoachAttribution, consumeAppNext, peekAppNext, rememberRef } from "@/lib/rally";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -33,7 +33,7 @@ function Login() {
 
   useEffect(() => {
     if (ref) rememberRef(ref);
-    if (coach) rememberCoach(coach);
+    applyLoginCoachAttribution(window.localStorage, coach);
   }, [ref, coach]);
 
   if (user) {

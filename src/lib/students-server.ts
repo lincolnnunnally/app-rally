@@ -71,6 +71,12 @@ async function notify(sql: Sql, userId: string, title: string, body: string, hre
   `;
 }
 
+export async function profileDisplayName(sql: Sql, userId: string, fallback: string) {
+  const row = (await sql`select display_name from profiles where user_id = ${userId} limit 1`)[0];
+  const text = row?.display_name == null ? "" : String(row.display_name).trim();
+  return text || fallback;
+}
+
 export async function coachStudents(sql: Sql, coachId: string) {
   const rows = await sql`
     select p.user_id, p.display_name, p.city, p.claim_code, p.guardian_user_id,

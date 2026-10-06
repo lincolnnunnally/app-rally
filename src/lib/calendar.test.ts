@@ -44,7 +44,6 @@ function lesson(partial: Partial<FeedLesson> & Pick<FeedLesson, "id" | "startsAt
     timezone: "America/New_York",
     updatedAt: "2026-10-01 12:00:00",
     createdAt: "2026-09-01 12:00:00",
-    notes: null,
     ...partial,
   };
 }
@@ -257,6 +256,63 @@ describe("feed visibility", () => {
     assert.equal(packed.includes("hidden@example.com"), false);
     assert.equal(mapped.cancelReason, "Canceled for weather.");
     assert.equal(mapped.courtName, "Ed Smith Complex");
+  });
+
+  it("keeps typed notes out of the feed for every status and still shows a cancel reason", () => {
+    const hidden = [
+      "scheduled lesson note",
+      "QA request guardian",
+      "canceled lesson note",
+      "coach private note",
+      "journal entry text",
+    ];
+    const rows = [
+      {
+        id: 31,
+        starts_at: "2026-10-27 17:30:00",
+        status: "confirmed",
+        notes: "scheduled lesson note",
+        private_notes: "coach private note",
+        journal: "journal entry text",
+        coach_user_id: "coach-a",
+        player_user_id: "player-a",
+        coach_name: "Coach Ada",
+        player_name: "Kaia",
+      },
+      {
+        id: 32,
+        starts_at: "2026-10-28 17:30:00",
+        status: "requested",
+        notes: "QA request guardian",
+        coach_user_id: "coach-a",
+        player_user_id: "player-a",
+        coach_name: "Coach Ada",
+        player_name: "Kaia",
+      },
+      {
+        id: 34,
+        starts_at: "2026-10-29 17:30:00",
+        status: "cancelled",
+        notes: "canceled lesson note",
+        cancel_reason: "Rain day",
+        coach_user_id: "coach-a",
+        player_user_id: "player-a",
+        coach_name: "Coach Ada",
+        player_name: "Kaia",
+      },
+    ];
+    const lessons = rows.map((row) => toFeedLesson(row));
+    const packed = JSON.stringify(lessons);
+    const ics = buildCalendar(lessons, {
+      viewerId: "coach-a",
+      now: new Date("2026-10-06T15:00:00Z"),
+    });
+    for (const note of hidden) {
+      assert.equal(packed.includes(note), false, note);
+      assert.equal(ics.includes(note), false, note);
+    }
+    assert.equal(ics.includes("Notes:"), false);
+    assert.match(ics, /Canceled: Rain day/);
   });
 });
 

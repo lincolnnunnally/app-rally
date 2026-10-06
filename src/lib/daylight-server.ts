@@ -3,18 +3,14 @@ import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql, type Sql } from "@/lib/db";
 import {
-  DISMISS_KIND,
   buildSeasonSuggestions,
   courtPoint,
-  dismissalBody,
   formatClock,
   formatMonthDay,
   lessonForecastFlag,
   minutesOfDay,
-  parseDismissals,
   startsWithinHours,
   weekdayOf,
-  withDismissal,
   type DaylightOccurrence,
   type DismissedSuggestion,
   type ForecastHour,
@@ -57,14 +53,26 @@ function mapOccurrence(row: Record<string, unknown>): DaylightOccurrence {
   };
 }
 
+function isMissingDismissals(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /daylight_dismissals/i.test(message) && /does not exist/i.test(message);
+}
+
 async function readDismissals(sql: Sql, userId: string): Promise<DismissedSuggestion[]> {
-  const rows = await sql`
-    select body from journal_entries
-    where user_id = ${userId} and kind = ${DISMISS_KIND}
-    order by id desc
-    limit 1
-  `;
-  return parseDismissals(rows[0]?.body == null ? null : String(rows[0].body));
+  try {
+    const rows = await sql`
+      select series_id, lesson_date::text as lesson_date
+      from daylight_dismissals
+      where user_id = ${userId}
+    `;
+    return rows.map((row) => ({
+      seriesId: String(row.series_id),
+      fromDate: String(row.lesson_date).slice(0, 10),
+    }));
+  } catch (err) {
+    if (isMissingDismissals(err)) return [];
+    throw err;
+  }
 }
 
 export const listSeasonSuggestions = createServerFn({ method: "GET" })
@@ -113,29 +121,11 @@ export const dismissSeasonSuggestion = createServerFn({ method: "POST" })
       limit 1
     `;
     if (owned.length === 0) throw new Error("Series not found");
-    const existing = await sql`
-      select id, body from journal_entries
-      where user_id = ${context.userId} and kind = ${DISMISS_KIND}
-      order by id desc
-      limit 1
+    await sql`
+      insert into daylight_dismissals (series_id, lesson_date, user_id)
+      values (${data.series_id}, ${data.from_date}::date, ${context.userId})
+      on conflict (series_id, lesson_date, user_id) do nothing
     `;
-    const body = dismissalBody(
-      withDismissal(parseDismissals(existing[0]?.body == null ? null : String(existing[0].body)), {
-        seriesId: data.series_id,
-        fromDate: data.from_date,
-      }),
-    );
-    if (existing[0]) {
-      await sql`
-        update journal_entries set body = ${body}
-        where id = ${num(existing[0].id)} and user_id = ${context.userId}
-      `;
-    } else {
-      await sql`
-        insert into journal_entries (user_id, kind, title, body)
-        values (${context.userId}, ${DISMISS_KIND}, 'Daylight', ${body})
-      `;
-    }
     return { ok: true };
   });
 

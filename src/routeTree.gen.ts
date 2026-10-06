@@ -34,6 +34,7 @@ import { Route as AppYouRouteImport } from './routes/app/you'
 import { Route as ClaimCodeRouteImport } from './routes/claim.$code'
 import { Route as WhereIndexRouteImport } from './routes/where.index'
 import { Route as WhereCityRouteImport } from './routes/where.$city'
+import { Route as ApiAdminQaCleanupRouteImport } from './routes/api/admin/qa-cleanup'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiCalendarChar123tokenChar125DoticsRouteImport } from './routes/api/calendar/{$token}[.]ics'
 import { Route as AppLeaguesIndexRouteImport } from './routes/app/leagues.index'
@@ -167,6 +168,11 @@ const WhereCityRoute = WhereCityRouteImport.update({
   path: '/$city',
   getParentRoute: () => WhereRoute,
 } as any)
+const ApiAdminQaCleanupRoute = ApiAdminQaCleanupRouteImport.update({
+  id: '/api/admin/qa-cleanup',
+  path: '/api/admin/qa-cleanup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
+  '/api/admin/qa-cleanup': typeof ApiAdminQaCleanupRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/calendar/{$token}.ics': typeof ApiCalendarChar123tokenChar125DoticsRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/claim/$code': typeof ClaimCodeRoute
   '/app': typeof AppIndexRoute
   '/where': typeof WhereIndexRoute
+  '/api/admin/qa-cleanup': typeof ApiAdminQaCleanupRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/calendar/{$token}.ics': typeof ApiCalendarChar123tokenChar125DoticsRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
+  '/api/admin/qa-cleanup': typeof ApiAdminQaCleanupRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/calendar/{$token}.ics': typeof ApiCalendarChar123tokenChar125DoticsRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/where/$city'
     | '/app/'
     | '/where/'
+    | '/api/admin/qa-cleanup'
     | '/api/auth/$'
     | '/api/calendar/{$token}.ics'
     | '/app/leagues/$id'
@@ -361,6 +371,7 @@ export interface FileRouteTypes {
     | '/claim/$code'
     | '/app'
     | '/where'
+    | '/api/admin/qa-cleanup'
     | '/api/auth/$'
     | '/api/calendar/{$token}.ics'
     | '/app/leagues/$id'
@@ -395,6 +406,7 @@ export interface FileRouteTypes {
     | '/where/$city'
     | '/app/'
     | '/where/'
+    | '/api/admin/qa-cleanup'
     | '/api/auth/$'
     | '/api/calendar/{$token}.ics'
     | '/app/leagues/$id'
@@ -417,6 +429,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   WhereRoute: typeof WhereRouteWithChildren
   ClaimCodeRoute: typeof ClaimCodeRoute
+  ApiAdminQaCleanupRoute: typeof ApiAdminQaCleanupRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiCalendarChar123tokenChar125DoticsRoute: typeof ApiCalendarChar123tokenChar125DoticsRoute
 }
@@ -598,6 +611,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WhereCityRouteImport
       parentRoute: typeof WhereRoute
     }
+    '/api/admin/qa-cleanup': {
+      id: '/api/admin/qa-cleanup'
+      path: '/api/admin/qa-cleanup'
+      fullPath: '/api/admin/qa-cleanup'
+      preLoaderRoute: typeof ApiAdminQaCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -735,6 +755,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   WhereRoute: WhereRouteWithChildren,
   ClaimCodeRoute: ClaimCodeRoute,
+  ApiAdminQaCleanupRoute: ApiAdminQaCleanupRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiCalendarChar123tokenChar125DoticsRoute:
     ApiCalendarChar123tokenChar125DoticsRoute,

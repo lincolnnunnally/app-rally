@@ -2,6 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { LessonNotesEditor, LessonNotesRead, PrivateNotesEditor } from "@/components/lesson-notes";
+import { LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoEditor, LessonVideoRead } from "@/components/lesson-video";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +90,10 @@ function LessonScan() {
         {lessonWho(l)} · {l.coach_name} · {formatWall(l.starts_at)} · {l.duration_min} min
         {l.court_name ? ` · ${l.court_name}` : ""}
         {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
+        {l.open_ended ? " · standing" : l.series_id ? " · recurring" : ""}
       </p>
+      {l.cancel_reason ? <p className="mt-2 text-sm">{l.cancel_reason}</p> : null}
+      <LessonScheduleActions lesson={l} />
 
       {role === "coach" ? (
         <Card className="mt-6">

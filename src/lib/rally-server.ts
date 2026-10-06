@@ -30,8 +30,16 @@ import {
 } from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
+import { STANDING_HORIZON_WEEKS, weeklyStamps } from "@/lib/schedule";
+import {
+	assertScheduleColumns,
+	attachScheduleFields,
+	deliverLessonEmail,
+	stampNewLessons,
+	topUpStanding,
+} from "@/lib/schedule-server";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
-import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
+import { RALLY, citySlug, formatWall, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
 import { coachStudents, connectCoach, resolveScheduledPlayer } from "@/lib/students-server";
 import { applyPublicMask, isAccountlessStudent, parseCoachIds, parsePublicFields, privateNotesForViewer, publicFieldsToText } from "@/lib/students";
 
@@ -688,14 +696,6 @@ async function notify(sql: Sql, userId: string, title: string, body: string, hre
     insert into notifications (user_id, title, body, href)
     values (${userId}, ${title}, ${body}, ${href})
   `;
-}
-function addDays(starts: string, days: number) {
-	const [d, t = "00:00:00"] = starts.replace("T", " ").split(" ");
-	const [y, m, dd] = d.split("-").map(Number);
-	const dt = new Date(y, (m || 1) - 1, (dd || 1) + days);
-	const p = (n: number) => String(n).padStart(2, "0");
-	const time = t.length >= 8 ? t.slice(0, 8) : `${t}:00`.slice(0, 8);
-	return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} ${time}`;
 }
 async function priceLesson(sql: Sql, opts: { durationMin: number; serviceId?: number | null; courtId?: number | null }) {
 	let price = 0;
@@ -1359,6 +1359,7 @@ export const listCoaches = createServerFn({ method: "GET" }).middleware([authMid
 export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
 	const sql = await getSql();
 	await ensureSeed(sql);
+	await topUpStanding(sql, { coachId: context.userId });
 	const coach = await sql`
       select * from coach_profiles where user_id = ${context.userId} limit 1
     `;
@@ -1562,7 +1563,7 @@ export const saveCoachPayHandles = createServerFn({ method: "POST" }).middleware
 	return { ok: true, cash_app: cash || null, venmo: venmo || null };
 });
 async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): Promise<LessonRow[]> {
-	return (who.coach ? await sql`
+	const lessons = (who.coach ? await sql`
         select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
                l.duration_min, l.sport, l.status, l.notes, l.private_notes, l.price_cents, l.billing, l.group_spots,
                l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
@@ -1614,6 +1615,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
 			: null;
 		return lesson;
 	});
+	return attachScheduleFields(sql, lessons);
 }
 
 function mapLesson(r: Record<string, unknown>): LessonRow {
@@ -1639,6 +1641,9 @@ function mapLesson(r: Record<string, unknown>): LessonRow {
 		billing: String(r.billing ?? "hour"),
 		group_spots: r.group_spots == null ? null : num(r.group_spots),
 		series_id: r.series_id == null ? null : String(r.series_id),
+		timezone: r.timezone == null ? null : String(r.timezone),
+		open_ended: bool(r.open_ended),
+		cancel_reason: r.cancel_reason == null || String(r.cancel_reason).trim() === "" ? null : String(r.cancel_reason),
 		facility_fee_cents: num(r.facility_fee_cents ?? 0),
 		facility_cut_cents: num(r.facility_cut_cents ?? 0),
 		service_name: r.service_name == null ? null : String(r.service_name),
@@ -1648,7 +1653,9 @@ function mapLesson(r: Record<string, unknown>): LessonRow {
 	};
 }
 export const listMyLessons = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
-	return loadLessons(await getSql(), { player: context.userId });
+	const sql = await getSql();
+	await topUpStanding(sql, { playerId: context.userId });
+	return loadLessons(sql, { player: context.userId });
 });
 export const getLessonScan = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator(z.object({
 	id: z.coerce.number()
@@ -1694,8 +1701,13 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
 		coachId: lesson.coach_user_id,
 		notes: lesson.private_notes,
 	});
+	await topUpStanding(
+		sql,
+		role === "coach" ? { coachId: context.userId } : { playerId: lesson.player_user_id },
+	);
+	const [shown] = await attachScheduleFields(sql, [lesson]);
 	return {
-		lesson,
+		lesson: shown ?? lesson,
 		role,
 		player_video: showsPlayerLessonVideo({
 			actorId: context.userId,
@@ -1719,6 +1731,8 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	notes: z.string().max(LESSON_NOTES_MAX).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
+	open_ended: z.boolean().optional(),
+	timezone: z.string().max(80).optional(),
 	player_user_id: z.string().min(1).max(80).optional(),
 	for_kind: z.enum(["self", "child"]).optional(),
 	for_name: z.string().trim().max(80).optional()
@@ -1736,11 +1750,13 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 		courtId: data.court_id,
 		durationMin: data.duration_min
 	});
-	const weeks = data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
-	const series = weeks > 1 ? crypto.randomUUID() : null;
-	for (let i = 0; i < weeks; i += 1) {
-		const when = i === 0 ? starts : addDays(starts, i * 7);
-		await sql`
+	const openEnded = data.open_ended === true;
+	if (openEnded) await assertScheduleColumns(sql);
+	const weeks = openEnded ? STANDING_HORIZON_WEEKS : data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
+	const series = openEnded || weeks > 1 ? crypto.randomUUID() : null;
+	const ids: number[] = [];
+	for (const when of weeklyStamps(starts, weeks)) {
+		const inserted = await sql`
         insert into lessons (
           coach_user_id, player_user_id, court_id, starts_at, duration_min, sport, status, notes,
           service_id, price_cents, billing, series_id, facility_fee_cents, facility_cut_cents,
@@ -1752,14 +1768,18 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
           ${priced.facilityFee}, ${priced.facilityCut},
           'self', null
         )
+        returning id
       `;
+		ids.push(num(inserted[0]?.id));
 	}
+	await stampNewLessons(sql, ids, data.timezone, openEnded);
 	await connectCoach(sql, playerId, data.coach_user_id);
 	const who = await sql`
       select display_name from profiles where user_id = ${playerId} limit 1
     `;
 	const whoLine = who[0]?.display_name ?? "A player";
-	await notify(sql, data.coach_user_id, "Lesson request", `${whoLine} asked for ${data.sport}${weeks > 1 ? ` · ${weeks} weeks` : ""}.`, "/app/desk");
+	const span = openEnded ? " · standing" : weeks > 1 ? ` · ${weeks} weeks` : "";
+	await notify(sql, data.coach_user_id, "Lesson request", `${whoLine} asked for ${data.sport}${span}.`, "/app/desk");
 	return { ok: true };
 });
 export const logLesson = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -1772,6 +1792,8 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	private_notes: z.string().max(LESSON_NOTES_MAX).optional(),
 	service_id: z.coerce.number().optional(),
 	recur_weeks: z.coerce.number().min(1).max(12).optional(),
+	open_ended: z.boolean().optional(),
+	timezone: z.string().max(80).optional(),
 	group_spots: z.coerce.number().min(1).max(16).optional(),
 	for_kind: z.enum(["self", "child"]).optional(),
 	for_name: z.string().trim().max(80).optional()
@@ -1796,12 +1818,14 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 		courtId: data.court_id,
 		durationMin: data.duration_min
 	});
-	const weeks = data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
-	const series = weeks > 1 ? crypto.randomUUID() : null;
+	const openEnded = data.open_ended === true;
+	if (openEnded) await assertScheduleColumns(sql);
+	const weeks = openEnded ? STANDING_HORIZON_WEEKS : data.recur_weeks && data.recur_weeks > 1 ? data.recur_weeks : 1;
+	const series = openEnded || weeks > 1 ? crypto.randomUUID() : null;
 	const privateNotes = (data.private_notes || "").trim() || null;
-	for (let i = 0; i < weeks; i += 1) {
-		const when = i === 0 ? starts : addDays(starts, i * 7);
-		await sql`
+	const ids: number[] = [];
+	for (const when of weeklyStamps(starts, weeks)) {
+		const inserted = await sql`
         insert into lessons (
           coach_user_id, player_user_id, court_id, starts_at, duration_min, sport, status, notes,
           private_notes, service_id, price_cents, billing, group_spots, series_id, facility_fee_cents,
@@ -1814,12 +1838,17 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
           ${priced.facilityFee}, ${priced.facilityCut},
           'self', null
         )
+        returning id
       `;
+		ids.push(num(inserted[0]?.id));
 	}
+	await stampNewLessons(sql, ids, data.timezone, openEnded);
 	await connectCoach(sql, data.player_user_id, context.userId);
 	const playerName = String(player.display_name ?? "A student");
-	const title = weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books";
-	const body = "Your coach put a lesson on the board.";
+	const title = openEnded ? "Standing lesson" : weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books";
+	const body = openEnded
+		? "Your coach put a standing lesson on the board. It keeps the next 12 weeks filled."
+		: "Your coach put a lesson on the board.";
 	if (!isAccountlessStudent(data.player_user_id)) {
 		await notify(sql, data.player_user_id, title, body, "/app/coaches");
 	}
@@ -1827,6 +1856,12 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	if (guardianId && guardianId !== context.userId) {
 		await notify(sql, guardianId, title, `${playerName} has a lesson on the board.`, "/app/desk");
 	}
+	const mailTarget = isAccountlessStudent(data.player_user_id) ? guardianId : data.player_user_id;
+	await deliverLessonEmail(sql, mailTarget, {
+		kind: "confirm",
+		whenLabel: formatWall(starts),
+		detail: body,
+	});
 	return { ok: true };
 });
 export const saveLessonNotes = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -2021,7 +2056,8 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 })).handler(async ({ context, data }) => {
 	const sql = await getSql();
 	const lesson = (await sql`
-      select coach_user_id, player_user_id, price_cents, facility_fee_cents, facility_cut_cents, sport, status
+      select coach_user_id, player_user_id, price_cents, facility_fee_cents, facility_cut_cents, sport, status,
+             starts_at::text as starts_at
       from lessons where id = ${data.id}
     `)[0];
 	if (!lesson) throw new Error("Lesson not found");
@@ -2036,7 +2072,15 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 	});
 	if (!gate.ok) throw new Error(gate.error);
 	await sql`update lessons set status = ${data.status} where id = ${data.id}`;
-	if (data.status === "confirmed") await notify(sql, player, "Lesson confirmed", `Your ${lesson.sport} lesson is on the board.`, "/app/coaches");
+	const whenLabel = formatWall(lesson.starts_at == null ? null : String(lesson.starts_at));
+	if (data.status === "confirmed") {
+		await notify(sql, player, "Lesson confirmed", `Your ${lesson.sport} lesson is on the board.`, "/app/coaches");
+		await deliverLessonEmail(sql, player, {
+			kind: "confirm",
+			whenLabel,
+			detail: `Your ${lesson.sport} lesson is on the board.`,
+		});
+	}
 	else if (data.status === "declined") await notify(sql, player, "Lesson declined", "The coach declined that time. Try another window.", "/app/coaches");
 	else if (data.status === "checked_in") {
 		const other = context.userId === coach ? player : coach;
@@ -2120,7 +2164,15 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 			"Pay on Cash App or Venmo — same handles as the coach desk Books.",
 			context.userId === coach ? "/app/coaches" : "/app/desk",
 		);
-	} else if (data.status === "cancelled") await notify(sql, context.userId === coach ? player : coach, "Lesson cancelled", "A lesson came off the board.", "/app/desk");
+	} else if (data.status === "cancelled") {
+		const other = context.userId === coach ? player : coach;
+		await notify(sql, other, "Lesson cancelled", "A lesson came off the board.", "/app/desk");
+		await deliverLessonEmail(sql, other, {
+			kind: "cancel",
+			whenLabel,
+			detail: "A lesson came off the board.",
+		});
+	}
 	return { ok: true };
 });
 export const sendPlayRequest = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({

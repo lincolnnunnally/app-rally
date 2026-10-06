@@ -492,6 +492,9 @@ export type LessonRow = {
   billing: string;
   group_spots: number | null;
   series_id: string | null;
+  timezone: string | null;
+  open_ended: boolean;
+  cancel_reason: string | null;
   facility_fee_cents: number;
   facility_cut_cents: number;
   service_name: string | null;

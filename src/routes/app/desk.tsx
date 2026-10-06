@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
+import { LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
 import {
   CopyClaimLink,
   FinishStudentForm,
@@ -15,6 +16,7 @@ import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/
 import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL, scheduleStudents } from "@/lib/students";
 import { createStudent, listHousehold } from "@/lib/students-server";
 import { lessonIsOpen } from "@/lib/lesson-status";
+import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
 import { withCoachAsPlayer } from "@/lib/lesson-video";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +93,7 @@ function Desk() {
 
   const upcoming = (desk.data?.lessons ?? []).filter((l) => lessonIsOpen(l.status));
   const requests = (desk.data?.lessons ?? []).filter((l) => l.status === "requested");
+  const canceled = (desk.data?.lessons ?? []).filter((l) => l.status === "cancelled");
   const completed = (desk.data?.lessons ?? []).filter((l) => l.status === "completed");
   const pipeline = desk.data?.pipeline;
   const logPeople = useMemo(() => {
@@ -160,6 +163,15 @@ function Desk() {
           </div>
 
           <section className="mt-10">
+            <h2 className="font-display text-2xl">Weather day</h2>
+            <p className="mt-1 max-w-lg text-sm text-muted-foreground">
+              Cancel every open lesson you have on one day. They stay on the board as canceled,
+              with the reason. Other coaches are left alone. Players get a notice.
+            </p>
+            <WeatherCancelForm />
+          </section>
+
+          <section className="mt-10">
             <h2 className="font-display text-2xl">Requests</h2>
             <div className="mt-3 flex flex-col gap-2">
               {requests.length === 0 ? (
@@ -170,7 +182,7 @@ function Desk() {
                     <div>
                       <p className="text-sm">
                         {lessonWho(l)} · {l.service_name ?? sportLabel(l.sport)}
-                        {l.series_id ? " · series" : ""}
+                        {l.open_ended ? " · standing" : l.series_id ? " · series" : ""}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatWall(l.starts_at)} · {l.duration_min} min · {l.court_name ?? "Court TBD"}
@@ -179,6 +191,7 @@ function Desk() {
                         {l.facility_cut_cents > 0 ? ` · cut ${money(l.facility_cut_cents)}` : ""}
                       </p>
                       {l.notes ? <p className="mt-1 text-sm">{l.notes}</p> : null}
+                      <LessonScheduleActions lesson={l} />
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => setStatus.mutate({ id: l.id, status: "confirmed" })}>
@@ -213,7 +226,7 @@ function Desk() {
                       <span>
                         {lessonWho(l)} · {formatWall(l.starts_at)}
                         {l.service_name ? ` · ${l.service_name}` : ""}
-                        {l.series_id ? " · recurring" : ""}
+                        {l.open_ended ? " · standing" : l.series_id ? " · recurring" : ""}
                         {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
                         {l.rally_take_cents > 0 ? ` · Rally ${money(l.rally_take_cents)}` : ""}
                         {l.status === "checked_in" ? " · checked in" : ""}
@@ -245,6 +258,7 @@ function Desk() {
                       </div>
                     </div>
                     <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />
+                    <LessonScheduleActions lesson={l} />
                     <div className="mt-3">
                       <Button size="sm" variant="secondary" asChild>
                         <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>
@@ -301,6 +315,27 @@ function Desk() {
               />
             </Card>
           ) : null}
+
+          <section className="mt-10">
+            <h2 className="font-display text-2xl">Canceled</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Weather days and other cancels stay on the board. The row is not deleted.
+            </p>
+            {canceled.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">No canceled lessons in this list.</p>
+            ) : (
+              <ul className="mt-3 flex flex-col gap-2">
+                {canceled.map((l) => (
+                  <li key={l.id} className="rounded-lg border border-border px-4 py-3 text-sm">
+                    <p>
+                      {lessonWho(l)} · {formatWall(l.starts_at)}
+                      {l.cancel_reason ? ` · ${l.cancel_reason}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           <section className="mt-10">
             <h2 className="font-display text-2xl">Completed</h2>
@@ -504,6 +539,8 @@ function LogLessonForm({
             private_notes: String(f.get("private_notes") || "") || undefined,
             service_id: serviceId,
             recur_weeks: Number(f.get("recur_weeks") || 1),
+            open_ended: f.get("open_ended") === "on",
+            timezone: String(f.get("timezone") || DEFAULT_LESSON_TIMEZONE),
             group_spots: f.get("group_spots") ? Number(f.get("group_spots")) : undefined,
           });
         }}
@@ -544,6 +581,23 @@ function LogLessonForm({
             <Input name="recur_weeks" type="number" defaultValue={1} min={1} max={12} />
           </Field>
         </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input name="open_ended" type="checkbox" className="size-4" />
+          Standing lesson, no end date
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Standing skips the 12-week cap and keeps the next 12 weeks on the board. Fixed series can
+          Extend or Renew later.
+        </p>
+        <Field label="Timezone">
+          <Select name="timezone" defaultValue={DEFAULT_LESSON_TIMEZONE}>
+            {LESSON_TIMEZONES.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label="When">
           <Input name="starts_at" type="datetime-local" required defaultValue={defaultLessonWhen()} />
         </Field>

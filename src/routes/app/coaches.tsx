@@ -22,8 +22,10 @@ import { PlayerProofBlock } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
 import { LessonNotesRead } from "@/components/lesson-notes";
+import { LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoRead } from "@/components/lesson-video";
 import { lessonStatusLabel } from "@/lib/lesson-status";
+import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
 import { listCoaches, listMyLessons, requestLesson } from "@/lib/rally-server";
@@ -90,7 +92,7 @@ function Coaches() {
                   <span>
                     {l.coach_name} · {l.service_name ?? sportLabel(l.sport)}
                     {l.for_kind === "child" && l.for_name ? ` · for ${l.for_name}` : ""}
-                    {l.series_id ? " · recurring" : ""}
+                    {l.open_ended ? " · standing" : l.series_id ? " · recurring" : ""}
                   </span>
                   <Badge>{lessonStatusLabel(l.status)}</Badge>
                 </div>
@@ -98,6 +100,7 @@ function Coaches() {
                   {formatWall(l.starts_at)} · {l.duration_min} min · {l.court_name ?? "Court TBD"}
                   {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
                 </p>
+                <LessonScheduleActions lesson={l} />
                 <div className="mt-3">
                   <LessonNotesRead notes={l.notes} />
                 </div>
@@ -289,6 +292,8 @@ function BookDialog({
               notes: String(f.get("notes") || "") || undefined,
               service_id: serviceId,
               recur_weeks: Number(f.get("recur_weeks") || 1),
+              open_ended: f.get("open_ended") === "on",
+              timezone: String(f.get("timezone") || DEFAULT_LESSON_TIMEZONE),
             });
           }}
         >
@@ -341,6 +346,20 @@ function BookDialog({
               <Label>Weeks (recurring)</Label>
               <Input name="recur_weeks" type="number" defaultValue={1} min={1} max={12} />
             </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input name="open_ended" type="checkbox" className="size-4" />
+            Standing lesson, no end date
+          </label>
+          <div className="flex flex-col gap-1.5">
+            <Label>Timezone</Label>
+            <Select name="timezone" defaultValue={DEFAULT_LESSON_TIMEZONE}>
+              {LESSON_TIMEZONES.map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Court</Label>

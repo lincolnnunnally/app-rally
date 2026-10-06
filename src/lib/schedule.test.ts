@@ -5,7 +5,11 @@ import {
   STANDING_HORIZON_WEEKS,
   addLocalWeeks,
   extendAfterLast,
+  cancelNoticeHref,
+  formatNoticeWhen,
+  lessonCameOff,
   lessonNoticeAudience,
+  lessonOnBoard,
   moveSingleLesson,
   noticeTarget,
   offsetMinutes,
@@ -193,26 +197,49 @@ describe("schedule notices", () => {
       ["student:kaia", guardian],
     );
 
+    assert.equal(formatNoticeWhen("2026-10-27 17:30:00"), "Tue, Oct 27, 5:30 PM");
+    assert.equal(
+      lessonOnBoard({ whenLabel: "Tue, Oct 27, 5:30 PM", coachName: "Coach Sam", playerName: "Kaia" }),
+      "Tue, Oct 27, 5:30 PM with Coach Sam for Kaia is on the board.",
+    );
+    assert.equal(
+      lessonCameOff({ whenLabel: "Tue, Oct 27, 5:30 PM", coachName: "Coach Sam", playerName: "Kaia" }),
+      "Tue, Oct 27, 5:30 PM with Coach Sam for Kaia came off the board.",
+    );
+    assert.equal(cancelNoticeHref(player, coach, 34), "/app/lessons/34");
+    assert.equal(cancelNoticeHref("guardian-1", coach, 34), "/app/lessons/34");
+    assert.equal(cancelNoticeHref(coach, coach, 34), "/app/desk");
+
     const moved = singleMoveNotice({
       actorId: coach,
       coachId: coach,
       playerId: player,
       lessonId: 2,
-      whenLabel: "Mon, Nov 2 · 8:00 AM",
+      whenLabel: "Tue, Oct 27, 5:30 PM",
+      coachName: "Coach Sam",
+      playerName: "Kaia",
     });
     assert.equal(moved?.userId, player);
     assert.equal(moved?.title, "Lesson rescheduled");
     assert.equal(moved?.href, "/app/lessons/2");
+    assert.match(moved?.body ?? "", /Tue, Oct 27, 5:30 PM/);
+    assert.match(moved?.body ?? "", /Coach Sam with Kaia/);
 
     const shifted = seriesShiftNotice({
       actorId: player,
       coachId: coach,
       playerId: player,
       lessonId: 2,
-      fromDate: "2026-11-02",
-      timeLabel: "8:00 AM",
+      fromDate: "2026-10-27",
+      timeLabel: "17:30",
+      coachName: "Coach Sam",
+      playerName: "Kaia",
     });
     assert.equal(shifted?.userId, coach);
+    assert.equal(shifted?.href, "/app/lessons/2");
+    assert.match(shifted?.body ?? "", /Tue, Oct 27/);
+    assert.match(shifted?.body ?? "", /5:30 PM/);
+    assert.match(shifted?.body ?? "", /Coach Sam with Kaia/);
 
     const weather = weatherCancelNotices(
       [
@@ -222,6 +249,8 @@ describe("schedule notices", () => {
           player_user_id: player,
           starts_at: "2026-11-02 08:00:00",
           status: "confirmed",
+          coach_name: "Coach Sam",
+          player_name: "Kaia",
         },
         {
           id: 2,
@@ -229,6 +258,8 @@ describe("schedule notices", () => {
           player_user_id: player,
           starts_at: "2026-11-02 15:00:00",
           status: "confirmed",
+          coach_name: "Coach Sam",
+          player_name: "Kaia",
         },
         {
           id: 3,
@@ -236,6 +267,8 @@ describe("schedule notices", () => {
           player_user_id: otherPlayer,
           starts_at: "2026-11-02 09:00:00",
           status: "confirmed",
+          coach_name: "Coach Sam",
+          player_name: "Jules",
         },
         {
           id: 4,
@@ -254,6 +287,12 @@ describe("schedule notices", () => {
       [player, otherPlayer],
     );
     assert.equal(weather[0]?.title, "Lesson canceled");
+    assert.equal(weather[0]?.href, "/app/lessons/1");
+    assert.match(weather[0]?.body ?? "", /Mon, Nov 2, 8:00 AM with Coach Sam for Kaia came off the board/);
+    assert.match(weather[0]?.body ?? "", /Mon, Nov 2, 3:00 PM with Coach Sam for Kaia came off the board/);
     assert.match(weather[0]?.body ?? "", /Canceled for weather/);
+    assert.equal(weather[1]?.href, "/app/lessons/3");
+    assert.match(weather[1]?.body ?? "", /Jules/);
+    assert.doesNotMatch(weather[0]?.href ?? "", /\/app\/desk/);
   });
 });

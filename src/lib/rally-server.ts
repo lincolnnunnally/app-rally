@@ -30,7 +30,7 @@ import {
 } from "@/lib/lesson-video";
 import { SESSION_BODY_MAX } from "@/lib/session-journal";
 import { canActorSetLessonStatus } from "@/lib/lesson-status";
-import { STANDING_HORIZON_WEEKS, weeklyStamps } from "@/lib/schedule";
+import { STANDING_HORIZON_WEEKS, cancelNoticeHref, formatNoticeWhen, lessonCameOff, lessonOnBoard, weeklyStamps } from "@/lib/schedule";
 import {
 	assertScheduleColumns,
 	attachScheduleFields,
@@ -39,8 +39,8 @@ import {
 	topUpStanding,
 } from "@/lib/schedule-server";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
-import { RALLY, citySlug, formatWall, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
-import { assertCoachCanSchedulePlayer, coachStudents, connectCoach, resolveScheduledPlayer } from "@/lib/students-server";
+import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
+import { assertCoachCanSchedulePlayer, coachStudents, connectCoach, profileDisplayName, resolveScheduledPlayer } from "@/lib/students-server";
 import { applyPublicMask, parseCoachIds, parsePublicFields, privateNotesForViewer, publicFieldsToText } from "@/lib/students";
 
 export type { ReviewRow };
@@ -1779,8 +1779,16 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
       select display_name from profiles where user_id = ${playerId} limit 1
     `;
 	const whoLine = who[0]?.display_name ?? "A player";
+	const coachName = await profileDisplayName(sql, data.coach_user_id, "Coach");
 	const span = openEnded ? " · standing" : weeks > 1 ? ` · ${weeks} weeks` : "";
-	await notify(sql, data.coach_user_id, "Lesson request", `${whoLine} asked for ${data.sport}${span}.`, "/app/desk");
+	const whenLabel = formatNoticeWhen(starts);
+	await notify(
+		sql,
+		data.coach_user_id,
+		"Lesson request",
+		`${whenLabel}: ${whoLine} asked ${coachName} for ${data.sport}${span}.`,
+		"/app/desk",
+	);
 	return { ok: true };
 });
 export const logLesson = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -1847,9 +1855,10 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	await stampNewLessons(sql, ids, data.timezone, openEnded);
 	await connectCoach(sql, data.player_user_id, context.userId);
 	const title = openEnded ? "Standing lesson" : weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books";
-	const body = openEnded
-		? "Your coach put a standing lesson on the board. It keeps the next 12 weeks filled."
-		: "Your coach put a lesson on the board.";
+	const coachName = await profileDisplayName(sql, context.userId, "Coach");
+	const playerName = String(player.display_name ?? "").trim() || "Player";
+	const whenLabel = formatNoticeWhen(starts);
+	const body = lessonOnBoard({ whenLabel, coachName, playerName });
 	await deliverLessonNotice(sql, {
 		recipientId: data.player_user_id,
 		playerId: data.player_user_id,
@@ -1859,7 +1868,7 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 		href: "/app/coaches",
 		mail: {
 			kind: "confirm",
-			whenLabel: formatWall(starts),
+			whenLabel,
 			detail: body,
 		},
 	});
@@ -2073,9 +2082,11 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 	});
 	if (!gate.ok) throw new Error(gate.error);
 	await sql`update lessons set status = ${data.status} where id = ${data.id}`;
-	const whenLabel = formatWall(lesson.starts_at == null ? null : String(lesson.starts_at));
+	const whenLabel = formatNoticeWhen(lesson.starts_at == null ? null : String(lesson.starts_at));
+	const coachName = await profileDisplayName(sql, coach, "Coach");
+	const playerName = await profileDisplayName(sql, player, "Player");
 	if (data.status === "confirmed") {
-		const detail = `Your ${lesson.sport} lesson is on the board.`;
+		const detail = lessonOnBoard({ whenLabel, coachName, playerName });
 		await deliverLessonNotice(sql, {
 			recipientId: player,
 			playerId: player,
@@ -2171,14 +2182,14 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 		);
 	} else if (data.status === "cancelled") {
 		const other = context.userId === coach ? player : coach;
-		const detail = "A lesson came off the board.";
+		const detail = lessonCameOff({ whenLabel, coachName, playerName });
 		await deliverLessonNotice(sql, {
 			recipientId: other,
 			playerId: player,
 			actorId: context.userId,
 			title: "Lesson cancelled",
 			body: detail,
-			href: "/app/desk",
+			href: cancelNoticeHref(other, coach, data.id),
 			mail: { kind: "cancel", whenLabel, detail },
 		});
 	}

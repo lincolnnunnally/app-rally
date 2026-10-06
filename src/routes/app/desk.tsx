@@ -7,6 +7,7 @@ import { CalendarSubscribeCard } from "@/components/calendar-subscribe";
 import { LessonWeek } from "@/components/lesson-week";
 import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
 import { CancelLessonButton, LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
+import { SeasonSuggestionsCard, WeatherHeadsUp } from "@/components/season-desk";
 import {
   CopyClaimLink,
   FinishStudentForm,
@@ -107,6 +108,12 @@ function Desk() {
     );
   }, [desk.data?.students, profile.display_name, profile.user_id]);
   const [logPlayerId, setLogPlayerId] = useState<string | undefined>();
+  const [weatherDay, setWeatherDay] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (!weatherDay) return;
+    document.getElementById("weather-day-input")?.focus();
+  }, [weatherDay]);
 
   return (
     <div className="px-5 py-8">
@@ -138,6 +145,8 @@ function Desk() {
           </p>
         </Card>
       ) : null}
+
+      <SeasonSuggestionsCard />
 
       <div className="mt-8 flex flex-col gap-6">
         <LessonWeek perspective="coach" viewerId={profile.user_id} />
@@ -171,13 +180,14 @@ function Desk() {
           />
           </div>
 
-          <section className="mt-10">
+          <section id="weather-day" className="mt-10">
             <h2 className="font-display text-2xl">Weather day</h2>
             <p className="mt-1 max-w-lg text-sm text-muted-foreground">
               Cancel every open lesson you have on one day. They stay on the board as canceled,
               with the reason. Other coaches are left alone. Players get a notice.
             </p>
-            <WeatherCancelForm />
+            <WeatherHeadsUp onPickDay={setWeatherDay} />
+            <WeatherCancelForm day={weatherDay} />
           </section>
 
           <section className="mt-10">

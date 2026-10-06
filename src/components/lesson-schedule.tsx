@@ -189,7 +189,7 @@ export function LessonScheduleActions({ lesson }: { lesson: LessonRow }) {
   );
 }
 
-export function WeatherCancelForm() {
+export function WeatherCancelForm({ day }: { day?: string }) {
   const qc = useQueryClient();
   const cancel = useMutation({
     mutationFn: (input: { day: string; reason: string }) => cancelCoachDay({ data: input }),
@@ -216,7 +216,7 @@ export function WeatherCancelForm() {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label>Day</Label>
-          <Input name="day" type="date" required />
+          <Input id="weather-day-input" name="day" type="date" required key={day ?? "weather-day"} defaultValue={day} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>Reason</Label>

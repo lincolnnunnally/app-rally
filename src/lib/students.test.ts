@@ -11,6 +11,7 @@ import {
   omitNeverPublic,
   parsePublicFields,
   privateNotesForViewer,
+  rosterParentLine,
   scheduleStudents,
 } from "./students.ts";
 
@@ -142,6 +143,15 @@ describe("private coach notes", () => {
     for (const actorId of ["parent-1", "student:kaia", "stranger"]) {
       assert.equal(privateNotesForViewer({ actorId, coachId: "coach-a", notes }), null);
     }
+  });
+});
+
+describe("roster parent line", () => {
+  it("waits on a parent only for an unclaimed accountless student", () => {
+    assert.equal(rosterParentLine({ userId: "student:kaia", claimed: false }), "waiting on a parent");
+    assert.equal(rosterParentLine({ userId: "student:kaia", claimed: true }), "claimed");
+    assert.equal(rosterParentLine({ userId: "user-adult", claimed: false }), null);
+    assert.equal(rosterParentLine({ userId: "user-adult", claimed: true }), "claimed");
   });
 });
 

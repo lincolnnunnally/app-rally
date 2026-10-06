@@ -13,7 +13,7 @@ import {
 } from "@/components/students";
 import { LessonVideoEditor } from "@/components/lesson-video";
 import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
-import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL, scheduleStudents } from "@/lib/students";
+import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL, rosterParentLine, scheduleStudents } from "@/lib/students";
 import { createStudent, listHousehold } from "@/lib/students-server";
 import { lessonIsOpen } from "@/lib/lesson-status";
 import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
@@ -695,13 +695,15 @@ function StudentsPanel({
         {students.length === 0 ? (
           <li className="text-sm text-muted-foreground">No students yet.</li>
         ) : (
-          students.map((student) => (
+          students.map((student) => {
+            const parentLine = rosterParentLine(student);
+            return (
             <li key={student.user_id} className="rounded-md border border-border px-3 py-2">
               <p className="text-sm">
                 {student.display_name}
-                <span className="text-muted-foreground">
-                  {student.claimed ? " · claimed" : " · waiting on a parent"}
-                </span>
+                {parentLine ? (
+                  <span className="text-muted-foreground"> · {parentLine}</span>
+                ) : null}
               </p>
               {student.claim_code ? (
                 <CopyClaimLink code={student.claim_code} name={student.display_name} />
@@ -709,7 +711,8 @@ function StudentsPanel({
                 <p className="mt-1 text-xs text-muted-foreground">Connected from a lesson or invite.</p>
               )}
             </li>
-          ))
+            );
+          })
         )}
       </ul>
     </Card>

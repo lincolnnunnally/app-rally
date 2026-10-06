@@ -57,6 +57,19 @@ export function isAccountlessStudent(userId: string) {
   return userId.startsWith(STUDENT_USER_PREFIX);
 }
 
+/**
+ * Coach-created students have no login until a parent claims them.
+ * A real account is an adult (no guardian required) and gets no parent line.
+ */
+export function rosterParentLine(opts: {
+  userId: string;
+  claimed: boolean;
+}): "claimed" | "waiting on a parent" | null {
+  if (opts.claimed) return "claimed";
+  if (isAccountlessStudent(opts.userId)) return "waiting on a parent";
+  return null;
+}
+
 export function newStudentUserId() {
   return `${STUDENT_USER_PREFIX}${crypto.randomUUID()}`;
 }

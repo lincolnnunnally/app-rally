@@ -260,19 +260,90 @@ export type ScheduleNotice = {
   href: string;
 };
 
+/**
+ * Print a wall-clock stamp as "Tue, Oct 27, 5:30 PM".
+ * The stamp is already local time in the lesson timezone, or the coach timezone,
+ * with America/New_York as the fallback when that zone is missing. This does not
+ * convert the clock again.
+ */
+export function formatNoticeWhen(value: string | null | undefined): string {
+  if (!value) return "TBD";
+  const clean = value.replace(" ", "T").slice(0, 16);
+  const [date, time] = clean.split("T");
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return value;
+  const dateLabel = formatNoticeDate(date);
+  if (!time) return dateLabel;
+  const clock = formatNoticeClock(time);
+  return clock ? `${dateLabel}, ${clock}` : dateLabel;
+}
+
+export function formatNoticeDate(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return date;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(dt);
+  const month = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(dt);
+  return `${weekday}, ${month} ${d}`;
+}
+
+/** 24-hour "HH:MM" or "HH:MM:SS" into "5:30 PM". */
+export function formatNoticeClock(value: string): string {
+  const match = /^(\d{1,2}):(\d{2})/.exec(value.trim());
+  if (!match) return "";
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
+  if (!Number.isInteger(hh) || !Number.isInteger(mm) || hh > 23 || mm > 59) return "";
+  const h = hh % 12 || 12;
+  const ampm = hh >= 12 ? "PM" : "AM";
+  return `${h}:${String(mm).padStart(2, "0")} ${ampm}`;
+}
+
+export function noticeName(value: string | null | undefined, fallback: string): string {
+  const text = (value ?? "").replace(/\s+/g, " ").trim();
+  return text || fallback;
+}
+
+export function lessonOnBoard(opts: {
+  whenLabel: string;
+  coachName?: string | null;
+  playerName?: string | null;
+}): string {
+  return `${opts.whenLabel} with ${noticeName(opts.coachName, "Coach")} for ${noticeName(opts.playerName, "Player")} is on the board.`;
+}
+
+export function lessonCameOff(opts: {
+  whenLabel: string;
+  coachName?: string | null;
+  playerName?: string | null;
+  reason?: string | null;
+}): string {
+  const line = `${opts.whenLabel} with ${noticeName(opts.coachName, "Coach")} for ${noticeName(opts.playerName, "Player")} came off the board.`;
+  const reason = (opts.reason ?? "").trim();
+  return reason ? `${line} ${reason}` : line;
+}
+
+/** Players and guardians open the lesson. Coaches stay on the desk. */
+export function cancelNoticeHref(recipientId: string, coachId: string, lessonId: number): string {
+  if (recipientId === coachId) return "/app/desk";
+  return `/app/lessons/${lessonId}`;
+}
+
 export function singleMoveNotice(opts: {
   actorId: string;
   coachId: string;
   playerId: string;
   lessonId: number;
   whenLabel: string;
+  coachName?: string | null;
+  playerName?: string | null;
 }): ScheduleNotice | null {
   const userId = noticeTarget(opts.actorId, opts.coachId, opts.playerId);
   if (!userId) return null;
+  const who = `${noticeName(opts.coachName, "Coach")} with ${noticeName(opts.playerName, "Player")}`;
   return {
     userId,
     title: "Lesson rescheduled",
-    body: `One lesson moved to ${opts.whenLabel}. The rest of the series stays put.`,
+    body: `One lesson moved to ${opts.whenLabel}. ${who}. The rest of the series stays put.`,
     href: `/app/lessons/${opts.lessonId}`,
   };
 }
@@ -284,13 +355,18 @@ export function seriesShiftNotice(opts: {
   lessonId: number;
   fromDate: string;
   timeLabel: string;
+  coachName?: string | null;
+  playerName?: string | null;
 }): ScheduleNotice | null {
   const userId = noticeTarget(opts.actorId, opts.coachId, opts.playerId);
   if (!userId) return null;
+  const when = /^\d{4}-\d{2}-\d{2}$/.test(opts.fromDate) ? formatNoticeDate(opts.fromDate) : opts.fromDate;
+  const clock = formatNoticeClock(opts.timeLabel) || opts.timeLabel;
+  const who = `${noticeName(opts.coachName, "Coach")} with ${noticeName(opts.playerName, "Player")}`;
   return {
     userId,
     title: "Series rescheduled",
-    body: `Lessons on ${opts.fromDate} and after move to ${opts.timeLabel}. Earlier ones stay put.`,
+    body: `Lessons on ${when} and after move to ${clock}. ${who}. Earlier ones stay put.`,
     href: `/app/lessons/${opts.lessonId}`,
   };
 }
@@ -302,24 +378,39 @@ export function weatherCancelNotices(
     player_user_id: string;
     starts_at: string;
     status: string;
+    coach_name?: string | null;
+    player_name?: string | null;
   }[],
   coachId: string,
   day: string,
   reason: string,
 ): ScheduleNotice[] {
   const ids = new Set(weatherCancelIds(rows, coachId, day));
-  const seen = new Set<string>();
-  const notices: ScheduleNotice[] = [];
+  const byPlayer = new Map<string, typeof rows>();
   for (const row of rows) {
     if (!ids.has(row.id)) continue;
     const userId = noticeTarget(coachId, row.coach_user_id, row.player_user_id);
-    if (!userId || seen.has(userId)) continue;
-    seen.add(userId);
+    if (!userId) continue;
+    const list = byPlayer.get(userId) ?? [];
+    list.push(row);
+    byPlayer.set(userId, list);
+  }
+  const notices: ScheduleNotice[] = [];
+  for (const [userId, playerRows] of byPlayer) {
+    const first = playerRows[0]!;
+    const sentences = playerRows.map((row) =>
+      lessonCameOff({
+        whenLabel: formatNoticeWhen(row.starts_at),
+        coachName: row.coach_name,
+        playerName: row.player_name,
+      }),
+    );
+    const extra = reason.trim();
     notices.push({
       userId,
       title: "Lesson canceled",
-      body: `${day}: ${reason}`,
-      href: `/app/lessons/${row.id}`,
+      body: extra ? `${sentences.join(" ")} ${extra}` : sentences.join(" "),
+      href: cancelNoticeHref(userId, first.coach_user_id, first.id),
     });
   }
   return notices;

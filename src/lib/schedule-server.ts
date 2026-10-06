@@ -3,10 +3,10 @@ import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql, type Sql } from "@/lib/db";
 import { sendLessonCopy, type LessonMailKind } from "@/lib/lesson-mail";
-import { formatWall } from "@/lib/rally";
 import type { LessonRow } from "@/lib/rally";
 import {
   extendAfterLast,
+  formatNoticeWhen,
   isOpenLesson,
   lessonNoticeAudience,
   lessonTimeZone,
@@ -23,7 +23,7 @@ import {
   type ScheduleOccurrence,
 } from "@/lib/schedule";
 import { isAccountlessStudent } from "@/lib/students";
-import { assertCoachCanSchedulePlayer } from "@/lib/students-server";
+import { assertCoachCanSchedulePlayer, profileDisplayName } from "@/lib/students-server";
 
 const MIGRATION_HINT =
   "This scheduling action needs migration 0016_lesson_schedule.sql. It is not applied yet.";
@@ -380,13 +380,17 @@ export const moveLesson = createServerFn({ method: "POST" })
           timezone = coalesce(timezone, ${lessonTimeZone(current.timezone == null ? null : String(current.timezone))})
       where id = ${occurrence.id}
     `;
-    const whenLabel = formatWall(moved.starts_at);
+    const whenLabel = formatNoticeWhen(moved.starts_at);
+    const coachName = await profileDisplayName(sql, occurrence.coach_user_id, "Coach");
+    const playerName = await profileDisplayName(sql, occurrence.player_user_id, "Player");
     const notice = singleMoveNotice({
       actorId: context.userId,
       coachId: occurrence.coach_user_id,
       playerId: occurrence.player_user_id,
       lessonId: occurrence.id,
       whenLabel,
+      coachName,
+      playerName,
     });
     await mailAndNotify(
       sql,
@@ -394,7 +398,7 @@ export const moveLesson = createServerFn({ method: "POST" })
       {
         kind: "reschedule",
         whenLabel,
-        detail: "One lesson moved. Other dates in the series are unchanged.",
+        detail: notice?.body ?? `One lesson moved to ${whenLabel}.`,
       },
       occurrence.player_user_id,
       context.userId,
@@ -430,26 +434,29 @@ export const shiftLessonSeries = createServerFn({ method: "POST" })
       `;
     }
     const first = changed[0]!;
-    const timeLabel =
-      formatWall(`2000-01-01 ${first.starts_at.slice(11, 19)}`).split(" · ")[1] ?? data.local_time;
+    const coachName = await profileDisplayName(sql, first.coach_user_id, "Coach");
     const players = [...new Set(changed.map((row) => row.player_user_id))];
     for (const playerId of players) {
       const sample = changed.find((row) => row.player_user_id === playerId)!;
+      const playerName = await profileDisplayName(sql, playerId, "Player");
+      const whenLabel = formatNoticeWhen(sample.starts_at);
       const notice = seriesShiftNotice({
         actorId: context.userId,
         coachId: sample.coach_user_id,
         playerId,
         lessonId: sample.id,
         fromDate: data.from_date,
-        timeLabel,
+        timeLabel: data.local_time,
+        coachName,
+        playerName,
       });
       await mailAndNotify(
         sql,
         notice,
         {
           kind: "reschedule",
-          whenLabel: `${data.from_date} · ${timeLabel}`,
-          detail: "Lessons on that date and after moved. Earlier ones stayed put.",
+          whenLabel,
+          detail: notice?.body ?? `Lessons on ${whenLabel} and after moved.`,
         },
         playerId,
         context.userId,
@@ -517,11 +524,14 @@ export const cancelCoachDay = createServerFn({ method: "POST" })
     await assertScheduleColumns(sql);
     const reason = weatherReason(data.reason);
     const rows = await sql`
-      select id, coach_user_id, player_user_id, starts_at::text as starts_at, status
-      from lessons
-      where coach_user_id = ${context.userId}
-        and starts_at >= ${data.day}::timestamp
-        and starts_at < (${data.day}::timestamp + interval '1 day')
+      select l.id, l.coach_user_id, l.player_user_id, l.starts_at::text as starts_at, l.status,
+             pc.display_name as coach_name, pp.display_name as player_name
+      from lessons l
+      left join profiles pc on pc.user_id = l.coach_user_id
+      left join profiles pp on pp.user_id = l.player_user_id
+      where l.coach_user_id = ${context.userId}
+        and l.starts_at >= ${data.day}::timestamp
+        and l.starts_at < (${data.day}::timestamp + interval '1 day')
     `;
     const mapped = rows.map((row) => ({
       id: num(row.id),
@@ -529,6 +539,8 @@ export const cancelCoachDay = createServerFn({ method: "POST" })
       player_user_id: String(row.player_user_id),
       starts_at: String(row.starts_at),
       status: String(row.status),
+      coach_name: row.coach_name == null ? null : String(row.coach_name),
+      player_name: row.player_name == null ? null : String(row.player_name),
     }));
     const ids = weatherCancelIds(mapped, context.userId, data.day);
     if (ids.length === 0) throw new Error("No open lessons on that day.");
@@ -543,8 +555,10 @@ export const cancelCoachDay = createServerFn({ method: "POST" })
         notice,
         {
           kind: "cancel",
-          whenLabel: data.day,
-          detail: reason,
+          whenLabel: formatNoticeWhen(
+            mapped.find((row) => row.player_user_id === notice.userId)?.starts_at ?? `${data.day} 00:00:00`,
+          ),
+          detail: notice.body,
         },
         notice.userId,
         context.userId,

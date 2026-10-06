@@ -56,7 +56,6 @@ export async function loadVisibleLessons(
            l.duration_min,
            l.sport,
            l.status,
-           l.notes,
            l.timezone,
            l.cancel_reason,
            l.created_at::text as created_at,

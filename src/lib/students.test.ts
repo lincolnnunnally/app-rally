@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   addCoachId,
   applyPublicMask,
+  canCoachSchedulePlayer,
   canFinishStudent,
   childrenOf,
   claimPath,
@@ -10,6 +11,7 @@ import {
   omitNeverPublic,
   parsePublicFields,
   privateNotesForViewer,
+  rosterParentLine,
   scheduleStudents,
 } from "./students.ts";
 
@@ -29,6 +31,33 @@ describe("coaches and guardians", () => {
   it("connects one player to more than one coach", () => {
     const ids = addCoachId(addCoachId([], "coach-a"), "coach-b");
     assert.deepEqual(addCoachId(ids, "coach-a"), ["coach-a", "coach-b"]);
+  });
+
+  it("lets a coach schedule a rostered student or themselves", () => {
+    assert.equal(
+      canCoachSchedulePlayer({
+        coachId: "coach-a",
+        playerId: "student:kaia",
+        coachUserIds: '["coach-a","coach-b"]',
+      }),
+      true,
+    );
+    assert.equal(
+      canCoachSchedulePlayer({
+        coachId: "coach-a",
+        playerId: "coach-a",
+        coachUserIds: "[]",
+      }),
+      true,
+    );
+    assert.equal(
+      canCoachSchedulePlayer({
+        coachId: "coach-a",
+        playerId: "user-random",
+        coachUserIds: "[]",
+      }),
+      false,
+    );
   });
 
   it("lets one guardian have more than one child", () => {
@@ -114,6 +143,15 @@ describe("private coach notes", () => {
     for (const actorId of ["parent-1", "student:kaia", "stranger"]) {
       assert.equal(privateNotesForViewer({ actorId, coachId: "coach-a", notes }), null);
     }
+  });
+});
+
+describe("roster parent line", () => {
+  it("waits on a parent only for an unclaimed accountless student", () => {
+    assert.equal(rosterParentLine({ userId: "student:kaia", claimed: false }), "waiting on a parent");
+    assert.equal(rosterParentLine({ userId: "student:kaia", claimed: true }), "claimed");
+    assert.equal(rosterParentLine({ userId: "user-adult", claimed: false }), null);
+    assert.equal(rosterParentLine({ userId: "user-adult", claimed: true }), "claimed");
   });
 });
 

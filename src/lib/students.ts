@@ -57,6 +57,19 @@ export function isAccountlessStudent(userId: string) {
   return userId.startsWith(STUDENT_USER_PREFIX);
 }
 
+/**
+ * Coach-created students have no login until a parent claims them.
+ * A real account is an adult (no guardian required) and gets no parent line.
+ */
+export function rosterParentLine(opts: {
+  userId: string;
+  claimed: boolean;
+}): "claimed" | "waiting on a parent" | null {
+  if (opts.claimed) return "claimed";
+  if (isAccountlessStudent(opts.userId)) return "waiting on a parent";
+  return null;
+}
+
 export function newStudentUserId() {
   return `${STUDENT_USER_PREFIX}${crypto.randomUUID()}`;
 }
@@ -104,6 +117,19 @@ function uniqueIds(ids: string[]) {
 /** A player can be connected to more than one coach. Order is stable. */
 export function addCoachId(ids: readonly string[], coachId: string) {
   return uniqueIds([...ids, coachId]);
+}
+
+export const NOT_ON_ROSTER = "That player is not on your roster.";
+
+/** A coach may schedule a rostered student, or themselves. */
+export function canCoachSchedulePlayer(opts: {
+  coachId: string;
+  playerId: string;
+  coachUserIds: unknown;
+}): boolean {
+  if (!opts.coachId || !opts.playerId) return false;
+  if (opts.playerId === opts.coachId) return true;
+  return parseCoachIds(opts.coachUserIds).includes(opts.coachId);
 }
 
 export function parsePublicFields(raw: unknown): OptionalPublicField[] {

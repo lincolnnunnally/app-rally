@@ -10,6 +10,8 @@ import {
   isClaimCode,
   newClaimCode,
   newStudentUserId,
+  canCoachSchedulePlayer,
+  NOT_ON_ROSTER,
   parseCoachIds,
   parsePublicFields,
   publicFieldsToText,
@@ -17,6 +19,22 @@ import {
 
 function num(v: unknown) {
   return typeof v === "number" ? v : Number(v);
+}
+
+export async function assertCoachCanSchedulePlayer(sql: Sql, coachId: string, playerId: string) {
+  if (playerId === coachId) return;
+  const row = (await sql`
+    select coach_user_ids from profiles where user_id = ${playerId} limit 1
+  `)[0];
+  if (
+    !canCoachSchedulePlayer({
+      coachId,
+      playerId,
+      coachUserIds: row?.coach_user_ids,
+    })
+  ) {
+    throw new Error(NOT_ON_ROSTER);
+  }
 }
 
 export async function connectCoach(sql: Sql, playerId: string, coachId: string) {
@@ -51,6 +69,12 @@ async function notify(sql: Sql, userId: string, title: string, body: string, hre
     insert into notifications (user_id, title, body, href)
     values (${userId}, ${title}, ${body}, ${href})
   `;
+}
+
+export async function profileDisplayName(sql: Sql, userId: string, fallback: string) {
+  const row = (await sql`select display_name from profiles where user_id = ${userId} limit 1`)[0];
+  const text = row?.display_name == null ? "" : String(row.display_name).trim();
+  return text || fallback;
 }
 
 export async function coachStudents(sql: Sql, coachId: string) {

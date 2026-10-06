@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,15 +11,14 @@ import {
   weekDates,
   type FeedLesson,
 } from "@/lib/calendar";
+import { listWeekLessons } from "@/lib/calendar-server";
 import { DEFAULT_LESSON_TIMEZONE, todayInZone } from "@/lib/schedule";
 
 export function LessonWeek({
-  lessons,
   perspective,
   viewerId,
   timeZone = DEFAULT_LESSON_TIMEZONE,
 }: {
-  lessons: readonly FeedLesson[];
   perspective: "coach" | "player";
   viewerId: string;
   timeZone?: string;
@@ -26,6 +26,11 @@ export function LessonWeek({
   const today = todayInZone(timeZone);
   const [monday, setMonday] = useState(() => mondayOnOrBefore(today));
   const days = useMemo(() => weekDates(monday), [monday]);
+  const week = useQuery({
+    queryKey: ["week-lessons", perspective, monday],
+    queryFn: () => listWeekLessons({ data: { role: perspective, week_start: monday } }),
+  });
+  const lessons = week.data ?? [];
 
   return (
     <section>
@@ -48,6 +53,13 @@ export function LessonWeek({
           </Button>
         </div>
       </div>
+      {week.isPending ? (
+        <p className="mt-4 text-sm text-muted-foreground">Loading this week…</p>
+      ) : week.isError ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          {week.error instanceof Error ? week.error.message : "Could not load this week."}
+        </p>
+      ) : (
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-7">
         {days.map((day) => {
           const label = formatWeekday(day);
@@ -82,6 +94,7 @@ export function LessonWeek({
           );
         })}
       </div>
+      )}
     </section>
   );
 }

@@ -27,7 +27,6 @@ import { LessonNotesRead } from "@/components/lesson-notes";
 import { LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoRead } from "@/components/lesson-video";
 import { lessonStatusLabel } from "@/lib/lesson-status";
-import { listFeedLessons } from "@/lib/calendar-server";
 import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
@@ -48,10 +47,6 @@ function Coaches() {
   const { fit } = Route.useSearch();
   const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => listCoaches() });
   const lessons = useQuery({ queryKey: ["my-lessons"], queryFn: () => listMyLessons() });
-  const week = useQuery({
-    queryKey: ["feed-lessons", "player"],
-    queryFn: () => listFeedLessons({ data: { role: "player" } }),
-  });
   const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
 
   const filtered = useMemo(() => {
@@ -93,15 +88,7 @@ function Coaches() {
             stay on the list below.
           </p>
         </div>
-        {week.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading the week…</p>
-        ) : week.isError ? (
-          <p className="text-sm text-muted-foreground">
-            {week.error instanceof Error ? week.error.message : "Could not load the week."}
-          </p>
-        ) : (
-          <LessonWeek lessons={week.data ?? []} perspective="player" viewerId={profile.user_id} />
-        )}
+        <LessonWeek perspective="player" viewerId={profile.user_id} />
         <CalendarSubscribeCard />
       </div>
 
@@ -290,7 +277,7 @@ function BookDialog({
       setOpen(false);
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
-      void qc.invalidateQueries({ queryKey: ["feed-lessons"] });
+      void qc.invalidateQueries({ queryKey: ["week-lessons"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

@@ -696,7 +696,7 @@ function StudentsPanel({
           <li className="text-sm text-muted-foreground">No students yet.</li>
         ) : (
           students.map((student) => {
-            const parentLine = rosterParentLine(student);
+            const parentLine = rosterParentLine({ userId: student.user_id, claimed: student.claimed });
             return (
             <li key={student.user_id} className="rounded-md border border-border px-3 py-2">
               <p className="text-sm">

@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
+import { CalendarSubscribeCard } from "@/components/calendar-subscribe";
+import { LessonWeek } from "@/components/lesson-week";
 import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
 import { LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
 import {
@@ -16,6 +18,7 @@ import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/
 import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL, scheduleStudents } from "@/lib/students";
 import { createStudent, listHousehold } from "@/lib/students-server";
 import { lessonIsOpen } from "@/lib/lesson-status";
+import { listFeedLessons } from "@/lib/calendar-server";
 import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
 import { withCoachAsPlayer } from "@/lib/lesson-video";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
@@ -74,6 +77,7 @@ function Desk() {
       void qc.invalidateQueries({ queryKey: ["desk"] });
       void qc.invalidateQueries({ queryKey: ["home"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
+      void qc.invalidateQueries({ queryKey: ["feed-lessons"] });
       const lesson = (desk.data?.lessons ?? []).find((l) => l.id === vars.id);
       if (vars.status === "completed" && lesson) setPayFor(lesson);
       toast.success(vars.status === "checked_in" ? "Checked in." : vars.status === "completed" ? "Checked out." : "Updated.");
@@ -89,7 +93,13 @@ function Desk() {
     void qc.invalidateQueries({ queryKey: ["my-lessons"] });
     void qc.invalidateQueries({ queryKey: ["notices"] });
     void qc.invalidateQueries({ queryKey: ["household"] });
+    void qc.invalidateQueries({ queryKey: ["feed-lessons"] });
   };
+
+  const week = useQuery({
+    queryKey: ["feed-lessons", "coach"],
+    queryFn: () => listFeedLessons({ data: { role: "coach" } }),
+  });
 
   const upcoming = (desk.data?.lessons ?? []).filter((l) => lessonIsOpen(l.status));
   const requests = (desk.data?.lessons ?? []).filter((l) => l.status === "requested");
@@ -134,6 +144,19 @@ function Desk() {
           </p>
         </Card>
       ) : null}
+
+      <div className="mt-8 flex flex-col gap-6">
+        {week.isPending ? (
+          <p className="text-sm text-muted-foreground">Loading the week…</p>
+        ) : week.isError ? (
+          <p className="text-sm text-muted-foreground">
+            {week.error instanceof Error ? week.error.message : "Could not load the week."}
+          </p>
+        ) : (
+          <LessonWeek lessons={week.data ?? []} perspective="coach" viewerId={profile.user_id} />
+        )}
+        <CalendarSubscribeCard />
+      </div>
 
       <Tabs defaultValue="board" className="mt-8">
         <TabsList>

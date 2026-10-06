@@ -21,10 +21,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { ProfileFace } from "@/components/profile-face";
 import { ProofDisplay } from "@/components/proof-lists";
+import { CalendarSubscribeCard } from "@/components/calendar-subscribe";
+import { LessonWeek } from "@/components/lesson-week";
 import { LessonNotesRead } from "@/components/lesson-notes";
 import { LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoRead } from "@/components/lesson-video";
 import { lessonStatusLabel } from "@/lib/lesson-status";
+import { listFeedLessons } from "@/lib/calendar-server";
 import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
@@ -45,6 +48,10 @@ function Coaches() {
   const { fit } = Route.useSearch();
   const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => listCoaches() });
   const lessons = useQuery({ queryKey: ["my-lessons"], queryFn: () => listMyLessons() });
+  const week = useQuery({
+    queryKey: ["feed-lessons", "player"],
+    queryFn: () => listFeedLessons({ data: { role: "player" } }),
+  });
   const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
 
   const filtered = useMemo(() => {
@@ -78,9 +85,29 @@ function Coaches() {
         both calendars.
       </p>
 
+      <div className="mt-8 flex flex-col gap-6">
+        <div>
+          <h2 className="font-display text-2xl">Your lessons</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your lessons and your students' lessons. Open one to move it. Notes and practice video
+            stay on the list below.
+          </p>
+        </div>
+        {week.isPending ? (
+          <p className="text-sm text-muted-foreground">Loading the week…</p>
+        ) : week.isError ? (
+          <p className="text-sm text-muted-foreground">
+            {week.error instanceof Error ? week.error.message : "Could not load the week."}
+          </p>
+        ) : (
+          <LessonWeek lessons={week.data ?? []} perspective="player" viewerId={profile.user_id} />
+        )}
+        <CalendarSubscribeCard />
+      </div>
+
       {(lessons.data ?? []).length > 0 ? (
         <div className="mt-8">
-          <h2 className="font-display text-2xl">Your lessons</h2>
+          <h2 className="font-display text-2xl">Lesson notes</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Session notes and the weekly practice cue from your coach. Same field as the desk.
             Practice video lives on the same lesson.
@@ -263,6 +290,7 @@ function BookDialog({
       setOpen(false);
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
+      void qc.invalidateQueries({ queryKey: ["feed-lessons"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

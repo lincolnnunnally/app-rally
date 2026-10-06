@@ -35,6 +35,7 @@ import { Route as ClaimCodeRouteImport } from './routes/claim.$code'
 import { Route as WhereIndexRouteImport } from './routes/where.index'
 import { Route as WhereCityRouteImport } from './routes/where.$city'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiCalendarChar123tokenChar125DoticsRouteImport } from './routes/api/calendar/{$token}[.]ics'
 import { Route as AppLeaguesIndexRouteImport } from './routes/app/leagues.index'
 import { Route as AppLeaguesIdRouteImport } from './routes/app/leagues.$id'
 import { Route as AppLessonsIdRouteImport } from './routes/app/lessons.$id'
@@ -171,6 +172,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCalendarChar123tokenChar125DoticsRoute =
+  ApiCalendarChar123tokenChar125DoticsRouteImport.update({
+    id: '/api/calendar/{$token}.ics',
+    path: '/api/calendar/{$token}.ics',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppLeaguesIndexRoute = AppLeaguesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -224,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/calendar/{$token}.ics': typeof ApiCalendarChar123tokenChar125DoticsRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
@@ -253,6 +261,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/where': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/calendar/{$token}.ics': typeof ApiCalendarChar123tokenChar125DoticsRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
@@ -287,6 +296,7 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/calendar/{$token}.ics': typeof ApiCalendarChar123tokenChar125DoticsRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/where/'
     | '/api/auth/$'
+    | '/api/calendar/{$token}.ics'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
     | '/where/$city/$slug'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/where'
     | '/api/auth/$'
+    | '/api/calendar/{$token}.ics'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
     | '/where/$city/$slug'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/where/'
     | '/api/auth/$'
+    | '/api/calendar/{$token}.ics'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
     | '/where/$city/$slug'
@@ -405,6 +418,7 @@ export interface RootRouteChildren {
   WhereRoute: typeof WhereRouteWithChildren
   ClaimCodeRoute: typeof ClaimCodeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiCalendarChar123tokenChar125DoticsRoute: typeof ApiCalendarChar123tokenChar125DoticsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -591,6 +605,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/calendar/{$token}.ics': {
+      id: '/api/calendar/{$token}.ics'
+      path: '/api/calendar/{$token}.ics'
+      fullPath: '/api/calendar/{$token}.ics'
+      preLoaderRoute: typeof ApiCalendarChar123tokenChar125DoticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/leagues/': {
       id: '/app/leagues/'
       path: '/'
@@ -715,7 +736,18 @@ const rootRouteChildren: RootRouteChildren = {
   WhereRoute: WhereRouteWithChildren,
   ClaimCodeRoute: ClaimCodeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiCalendarChar123tokenChar125DoticsRoute:
+    ApiCalendarChar123tokenChar125DoticsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

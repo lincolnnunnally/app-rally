@@ -685,15 +685,91 @@ export function readRef() {
   return window.localStorage.getItem(REF_KEY) || "";
 }
 
+/** A coach invite is only good for the sign-up that came from that link. */
+export const COACH_INVITE_TTL_MS = 30 * 60 * 1000;
+export const COACH_INVITE_SOURCE = "invite" as const;
+
+export type CoachInviteStorage = {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+};
+
+type CoachInviteRecord = {
+  code: string;
+  source: typeof COACH_INVITE_SOURCE;
+  at: number;
+};
+
+function coachCode(code: string) {
+  return code.trim().toLowerCase();
+}
+
+/** Store a coach code only as an invite, with the time it was captured. */
+export function writeCoachInvite(storage: CoachInviteStorage, code: string, now = Date.now()) {
+  const c = coachCode(code);
+  if (!c) {
+    storage.removeItem(COACH_KEY);
+    return;
+  }
+  const record: CoachInviteRecord = { code: c, source: COACH_INVITE_SOURCE, at: now };
+  storage.setItem(COACH_KEY, JSON.stringify(record));
+}
+
+/**
+ * Returns the coach code when the stored value is an unexpired invite.
+ * A bare string left by an older build is ignored.
+ */
+export function readCoachInvite(storage: CoachInviteStorage, now = Date.now()): string {
+  const raw = storage.getItem(COACH_KEY);
+  if (!raw) return "";
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "";
+  }
+  if (!parsed || typeof parsed !== "object") return "";
+  const record = parsed as Partial<CoachInviteRecord>;
+  if (record.source !== COACH_INVITE_SOURCE) return "";
+  if (typeof record.code !== "string") return "";
+  const code = coachCode(record.code);
+  if (!code) return "";
+  if (typeof record.at !== "number" || !Number.isFinite(record.at)) return "";
+  if (now < record.at || now - record.at > COACH_INVITE_TTL_MS) return "";
+  return code;
+}
+
+export function clearCoachInvite(storage: CoachInviteStorage) {
+  storage.removeItem(COACH_KEY);
+}
+
+/**
+ * /login?coach= refreshes the invite window (the join page sends people there).
+ * A plain /login drops any stored invite so a later sign-up is not attributed.
+ */
+export function applyLoginCoachAttribution(
+  storage: CoachInviteStorage,
+  coach: string | null | undefined,
+  now = Date.now(),
+) {
+  if (coach && coach.trim()) writeCoachInvite(storage, coach, now);
+  else clearCoachInvite(storage);
+}
+
 export function rememberCoach(code: string) {
   if (typeof window === "undefined") return;
-  const c = code.trim().toLowerCase();
-  if (c) window.localStorage.setItem(COACH_KEY, c);
+  writeCoachInvite(window.localStorage, code);
 }
 
 export function readCoach() {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(COACH_KEY) || "";
+  return readCoachInvite(window.localStorage);
+}
+
+export function clearCoach() {
+  if (typeof window === "undefined") return;
+  clearCoachInvite(window.localStorage);
 }
 
 export function sharePath(code: string) {

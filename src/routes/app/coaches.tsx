@@ -27,7 +27,6 @@ import { LessonNotesRead } from "@/components/lesson-notes";
 import { LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoRead } from "@/components/lesson-video";
 import { lessonStatusLabel } from "@/lib/lesson-status";
-import { listFeedLessons } from "@/lib/calendar-server";
 import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
 import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally";
 import { ReviewBlock } from "@/components/reviews";
@@ -48,10 +47,6 @@ function Coaches() {
   const { fit } = Route.useSearch();
   const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => listCoaches() });
   const lessons = useQuery({ queryKey: ["my-lessons"], queryFn: () => listMyLessons() });
-  const week = useQuery({
-    queryKey: ["feed-lessons", "player"],
-    queryFn: () => listFeedLessons({ data: { role: "player" } }),
-  });
   const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
 
   const filtered = useMemo(() => {
@@ -93,15 +88,7 @@ function Coaches() {
             stay on the list below.
           </p>
         </div>
-        {week.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading the week…</p>
-        ) : week.isError ? (
-          <p className="text-sm text-muted-foreground">
-            {week.error instanceof Error ? week.error.message : "Could not load the week."}
-          </p>
-        ) : (
-          <LessonWeek lessons={week.data ?? []} perspective="player" viewerId={profile.user_id} />
-        )}
+        <LessonWeek perspective="player" viewerId={profile.user_id} />
         <CalendarSubscribeCard />
       </div>
 
@@ -259,7 +246,7 @@ function CoachRow({
           ) : null}
           {!mine ? <ReviewBlock subjectType="coach" subjectId={c.user_id} noun={c.display_name} /> : null}
         </div>
-        {!mine && c.accepting ? (
+        {!mine ? (
           <BookDialog coach={c} courts={courts} childrenRows={childrenRows} />
         ) : null}
       </div>
@@ -290,7 +277,7 @@ function BookDialog({
       setOpen(false);
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
-      void qc.invalidateQueries({ queryKey: ["feed-lessons"] });
+      void qc.invalidateQueries({ queryKey: ["week-lessons"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -298,11 +285,18 @@ function BookDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Request</Button>
+        <Button>Request a lesson</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogTitle>Request {coach.display_name}</DialogTitle>
-        <DialogDescription>Pick the service. The coach confirms. Recurring weeks stay on both calendars.</DialogDescription>
+        <DialogDescription>
+          Pick the coach&apos;s time. They confirm or decline, and you get a notice either way.
+        </DialogDescription>
+        {coach.accepting ? null : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            This coach is on a waitlist. Send the time anyway — they can still confirm.
+          </p>
+        )}
         <form
           className="mt-4 flex flex-col gap-3"
           onSubmit={(e) => {

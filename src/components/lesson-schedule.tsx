@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { lessonIsOpen } from "@/lib/lesson-status";
 import { toInputValue, type LessonRow } from "@/lib/rally";
 import { DEFAULT_WEATHER_REASON } from "@/lib/schedule";
+import { setLessonStatus } from "@/lib/rally-server";
 import {
   cancelCoachDay,
   extendLessonSeries,
@@ -30,7 +31,7 @@ function refreshSchedule(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ["home"] });
   void qc.invalidateQueries({ queryKey: ["notices"] });
   void qc.invalidateQueries({ queryKey: ["lesson-scan"] });
-  void qc.invalidateQueries({ queryKey: ["feed-lessons"] });
+  void qc.invalidateQueries({ queryKey: ["week-lessons"] });
 }
 
 export function LessonScheduleActions({ lesson }: { lesson: LessonRow }) {
@@ -225,6 +226,76 @@ export function WeatherCancelForm({ day }: { day?: string }) {
       <div>
         <Button type="submit" variant="outline" disabled={cancel.isPending}>
           {cancel.isPending ? "Canceling…" : "Cancel this day"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function CancelLessonButton({
+  lessonId,
+  size = "sm",
+  variant = "ghost",
+}: {
+  lessonId: number;
+  size?: "default" | "sm";
+  variant?: "ghost" | "outline";
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const cancel = useMutation({
+    mutationFn: () =>
+      setLessonStatus({
+        data: { id: lessonId, status: "cancelled", reason: reason.trim() || undefined },
+      }),
+    onSuccess: () => {
+      toast.success("Lesson canceled.");
+      setOpen(false);
+      setReason("");
+      refreshSchedule(qc);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  if (!open) {
+    return (
+      <Button size={size} variant={variant} type="button" onClick={() => setOpen(true)}>
+        Cancel
+      </Button>
+    );
+  }
+
+  return (
+    <form
+      className="flex min-w-56 flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        cancel.mutate();
+      }}
+    >
+      <Label htmlFor={`cancel-reason-${lessonId}`}>Reason (optional)</Label>
+      <Textarea
+        id={`cancel-reason-${lessonId}`}
+        value={reason}
+        maxLength={500}
+        placeholder="Rain, sick, schedule change"
+        onChange={(event) => setReason(event.target.value)}
+      />
+      <div className="flex gap-2">
+        <Button size={size} type="submit" variant="outline" disabled={cancel.isPending}>
+          {cancel.isPending ? "Canceling…" : "Cancel lesson"}
+        </Button>
+        <Button
+          size={size}
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setOpen(false);
+            setReason("");
+          }}
+        >
+          Keep lesson
         </Button>
       </div>
     </form>

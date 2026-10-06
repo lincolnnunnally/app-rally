@@ -216,6 +216,54 @@ export function lessonsOnDate<T extends { startsAt: string; id: number }>(
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.id - b.id);
 }
 
+/**
+ * Stored occurrences whose wall-clock day falls in this Monday–Sunday.
+ * Recurring lessons are one row per week, so the row dated this week is the occurrence.
+ * This does not use the ICS feed window.
+ */
+export function lessonsInWeek(
+  viewerId: string,
+  lessons: readonly FeedLesson[],
+  weekStart: string,
+  role: FeedRole = "any",
+): FeedLesson[] {
+  const days = new Set(weekDates(weekStart));
+  return lessons
+    .filter((lesson) => lesson.status !== "declined")
+    .filter((lesson) => lessonMatchesRole(viewerId, lesson, role))
+    .filter((lesson) => {
+      const day = lessonDay(lesson.startsAt);
+      return day != null && days.has(day);
+    })
+    .slice()
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.id - b.id);
+}
+
+export function weekGridLines(
+  lessons: readonly { startsAt: string; id: number }[],
+  weekStart: string,
+): { date: string; label: string; items: string[] }[] {
+  return weekDates(weekStart).map((date) => {
+    const label = formatWeekday(date);
+    const rows = lessonsOnDate(lessons, date);
+    return {
+      date,
+      label: `${label.weekday} ${label.monthDay}`,
+      items: rows.length === 0 ? ["None"] : rows.map((row) => `${clockLabel(row.startsAt)} · lesson ${row.id}`),
+    };
+  });
+}
+
+function clockLabel(startsAt: string): string {
+  const time = startsAt.replace("T", " ").split(" ")[1] ?? "";
+  const [hh, mm] = time.split(":");
+  const hour = Number(hh);
+  if (!Number.isFinite(hour) || mm == null) return startsAt;
+  const h = hour % 12 || 12;
+  const ampm = hour >= 12 ? "PM" : "AM";
+  return `${h}:${mm.slice(0, 2)} ${ampm}`;
+}
+
 export function formatWeekday(date: string): { weekday: string; monthDay: string } {
   const [year, month, day] = date.split("-").map(Number);
   const utc = new Date(Date.UTC(year!, month! - 1, day));

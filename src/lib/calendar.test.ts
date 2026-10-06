@@ -10,6 +10,7 @@ import {
   isCalendarToken,
   lessonSequence,
   lessonUid,
+  lessonsInWeek,
   lessonsOnDate,
   mondayOnOrBefore,
   newCalendarToken,
@@ -19,6 +20,7 @@ import {
   shiftWeek,
   toFeedLesson,
   unfoldIcs,
+  weekGridLines,
   vtimezoneOffsetMinutes,
   wallToUtcDate,
   weekDates,
@@ -358,5 +360,82 @@ describe("week grid date math", () => {
       [43],
     );
     assert.equal(lessonsOnDate(rows, "2026-10-27").length, 0);
+  });
+
+  it("pages to a far week and shows the recurring occurrence the feed window drops", () => {
+    const asOf = "2026-10-06";
+    const far = lesson({
+      id: 32,
+      startsAt: "2027-01-25 10:00:00",
+      status: "confirmed",
+      coachName: "Coach Sam",
+      playerName: "Kaia",
+    });
+    assert.deepEqual(
+      selectFeedLessons("coach-a", [far], asOf, "coach").map((row) => row.id),
+      [],
+    );
+    let monday = mondayOnOrBefore(asOf);
+    assert.equal(monday, "2026-10-05");
+    for (let step = 0; step < 16; step += 1) monday = shiftWeek(monday, 1);
+    assert.equal(monday, "2027-01-25");
+    assert.deepEqual(weekDates(monday), [
+      "2027-01-25",
+      "2027-01-26",
+      "2027-01-27",
+      "2027-01-28",
+      "2027-01-29",
+      "2027-01-30",
+      "2027-01-31",
+    ]);
+    const visible = lessonsInWeek("coach-a", [far], monday, "coach");
+    assert.deepEqual(
+      visible.map((row) => row.id),
+      [32],
+    );
+    const grid = weekGridLines(visible, monday);
+    assert.equal(grid[0]?.items[0], "10:00 AM · lesson 32");
+    assert.deepEqual(
+      grid.slice(1).map((day) => day.items[0]),
+      ["None", "None", "None", "None", "None", "None"],
+    );
+    console.log("\n--- week grid Jan 25–31, 2027 ---");
+    for (const day of grid) console.log(`${day.label}: ${day.items.join(", ")}`);
+  });
+});
+
+describe("cancel reason in ICS", () => {
+  it("puts the typed cancel reason in the VEVENT and leaves every other note out", () => {
+    const row = toFeedLesson({
+      id: 32,
+      starts_at: "2027-01-25 10:00:00",
+      status: "cancelled",
+      cancel_reason: "Rain day",
+      notes: "session note that must stay off the feed",
+      private_notes: "coach private note",
+      journal: "journal entry text",
+      coach_user_id: "coach-a",
+      player_user_id: "player-a",
+      coach_name: "Coach Sam",
+      player_name: "Kaia",
+      sport: "tennis",
+      timezone: "America/New_York",
+    });
+    const ics = unfoldIcs(
+      buildCalendar([row], {
+        viewerId: "player-a",
+        now: new Date("2026-10-06T15:00:00Z"),
+        origin: "https://rally.unitedundergod.org",
+      }),
+    );
+    const event = ics.slice(ics.indexOf("BEGIN:VEVENT"), ics.indexOf("END:VEVENT") + "END:VEVENT".length);
+    assert.match(event, /Canceled: Rain day/);
+    assert.match(event, /STATUS:CANCELLED/);
+    assert.match(event, /URL:https:\/\/rally\.unitedundergod\.org\/app\/lessons\/32/);
+    assert.equal(event.includes("session note"), false);
+    assert.equal(event.includes("coach private note"), false);
+    assert.equal(event.includes("journal entry text"), false);
+    assert.equal(event.includes("Notes:"), false);
+    console.log("\n--- cancel ICS VEVENT ---\n" + event);
   });
 });

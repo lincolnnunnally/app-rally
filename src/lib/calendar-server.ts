@@ -5,6 +5,8 @@ import {
   calendarPath,
   feedWindow,
   isCalendarToken,
+  lessonsInWeek,
+  mondayOnOrBefore,
   newCalendarToken,
   selectFeedLessons,
   toFeedLesson,
@@ -12,7 +14,7 @@ import {
   type FeedRole,
 } from "@/lib/calendar";
 import { getSql, type Sql } from "@/lib/db";
-import { DEFAULT_LESSON_TIMEZONE, todayInZone } from "@/lib/schedule";
+import { DEFAULT_LESSON_TIMEZONE, addLocalDays, stampDate, todayInZone } from "@/lib/schedule";
 
 const WINDOW_ROLE = z.enum(["coach", "player"]);
 
@@ -122,4 +124,76 @@ export const listFeedLessons = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     return loadVisibleLessons(sql, context.userId, data.role);
+  });
+
+/** Lessons whose wall clock falls on the Monday–Sunday on screen. Not the ICS window. */
+export async function loadWeekLessons(
+  sql: Sql,
+  userId: string,
+  role: FeedRole,
+  weekStart: string,
+): Promise<FeedLesson[]> {
+  const monday = mondayOnOrBefore(weekStart);
+  const nextMonday = stampDate(addLocalDays(`${monday} 00:00:00`, 7));
+  const rows = await sql`
+    select l.id,
+           l.starts_at::text as starts_at,
+           l.duration_min,
+           l.sport,
+           l.status,
+           l.timezone,
+           l.cancel_reason,
+           l.created_at::text as created_at,
+           l.updated_at::text as updated_at,
+           l.coach_user_id,
+           l.player_user_id,
+           c.name as court_name,
+           pc.display_name as coach_name,
+           pp.display_name as player_name,
+           pp.guardian_user_id as guardian_user_id,
+           sv.name as service_name
+    from lessons l
+    left join courts c on c.id = l.court_id
+    left join profiles pc on pc.user_id = l.coach_user_id
+    left join profiles pp on pp.user_id = l.player_user_id
+    left join coach_services sv on sv.id = l.service_id
+    where l.status <> 'declined'
+      and l.starts_at >= ${monday}::timestamp
+      and l.starts_at < ${nextMonday}::timestamp
+      and (
+        (${role} = 'coach' and l.coach_user_id = ${userId})
+        or (
+          ${role} = 'player'
+          and (l.player_user_id = ${userId} or pp.guardian_user_id = ${userId})
+        )
+        or (
+          ${role} = 'any'
+          and (
+            l.coach_user_id = ${userId}
+            or l.player_user_id = ${userId}
+            or pp.guardian_user_id = ${userId}
+          )
+        )
+      )
+    order by l.starts_at, l.id
+  `;
+  return lessonsInWeek(
+    userId,
+    rows.map((row) => toFeedLesson(row)),
+    monday,
+    role,
+  );
+}
+
+export const listWeekLessons = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({
+      role: WINDOW_ROLE,
+      week_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    return loadWeekLessons(sql, context.userId, data.role, data.week_start);
   });

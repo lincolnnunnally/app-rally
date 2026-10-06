@@ -10,6 +10,8 @@ import {
   isClaimCode,
   newClaimCode,
   newStudentUserId,
+  canCoachSchedulePlayer,
+  NOT_ON_ROSTER,
   parseCoachIds,
   parsePublicFields,
   publicFieldsToText,
@@ -17,6 +19,22 @@ import {
 
 function num(v: unknown) {
   return typeof v === "number" ? v : Number(v);
+}
+
+export async function assertCoachCanSchedulePlayer(sql: Sql, coachId: string, playerId: string) {
+  if (playerId === coachId) return;
+  const row = (await sql`
+    select coach_user_ids from profiles where user_id = ${playerId} limit 1
+  `)[0];
+  if (
+    !canCoachSchedulePlayer({
+      coachId,
+      playerId,
+      coachUserIds: row?.coach_user_ids,
+    })
+  ) {
+    throw new Error(NOT_ON_ROSTER);
+  }
 }
 
 export async function connectCoach(sql: Sql, playerId: string, coachId: string) {

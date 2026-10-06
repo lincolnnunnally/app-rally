@@ -5,6 +5,7 @@ import {
   STANDING_HORIZON_WEEKS,
   addLocalWeeks,
   extendAfterLast,
+  lessonNoticeAudience,
   moveSingleLesson,
   noticeTarget,
   offsetMinutes,
@@ -144,6 +145,53 @@ describe("schedule notices", () => {
   it("notifies the other party for a move, a series shift, and a weather day", () => {
     assert.equal(noticeTarget(coach, coach, player), player);
     assert.equal(noticeTarget(player, coach, player), coach);
+
+    const guardian = "guardian-1";
+    assert.deepEqual(
+      lessonNoticeAudience({
+        recipientId: player,
+        playerId: player,
+        guardianId: guardian,
+        actorId: coach,
+      }),
+      [player, guardian],
+    );
+    assert.deepEqual(
+      lessonNoticeAudience({
+        recipientId: player,
+        playerId: player,
+        guardianId: player,
+        actorId: coach,
+      }),
+      [player],
+    );
+    assert.deepEqual(
+      lessonNoticeAudience({
+        recipientId: player,
+        playerId: player,
+        guardianId: coach,
+        actorId: coach,
+      }),
+      [player],
+    );
+    assert.deepEqual(
+      lessonNoticeAudience({
+        recipientId: coach,
+        playerId: player,
+        guardianId: guardian,
+        actorId: player,
+      }),
+      [coach],
+    );
+    assert.deepEqual(
+      lessonNoticeAudience({
+        recipientId: "student:kaia",
+        playerId: "student:kaia",
+        guardianId: guardian,
+        actorId: coach,
+      }),
+      ["student:kaia", guardian],
+    );
 
     const moved = singleMoveNotice({
       actorId: coach,

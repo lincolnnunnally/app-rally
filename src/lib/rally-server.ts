@@ -35,14 +35,14 @@ import { STANDING_HORIZON_WEEKS, weeklyStamps } from "@/lib/schedule";
 import {
 	assertScheduleColumns,
 	attachScheduleFields,
-	deliverLessonEmail,
+	deliverLessonNotice,
 	stampNewLessons,
 	topUpStanding,
 } from "@/lib/schedule-server";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, formatWall, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
-import { coachStudents, connectCoach, resolveScheduledPlayer } from "@/lib/students-server";
-import { applyPublicMask, isAccountlessStudent, parseCoachIds, parsePublicFields, privateNotesForViewer, publicFieldsToText } from "@/lib/students";
+import { assertCoachCanSchedulePlayer, coachStudents, connectCoach, resolveScheduledPlayer } from "@/lib/students-server";
+import { applyPublicMask, parseCoachIds, parsePublicFields, privateNotesForViewer, publicFieldsToText } from "@/lib/students";
 
 export type { ReviewRow };
 
@@ -1745,6 +1745,7 @@ export const requestLesson = createServerFn({ method: "POST" }).middleware([auth
 	const sql = await getSql();
 	const playerId = await resolveScheduledPlayer(sql, context.userId, data.player_user_id);
 	if (data.coach_user_id === playerId) throw new Error("You cannot book yourself.");
+	await assertCoachCanSchedulePlayer(sql, data.coach_user_id, playerId);
 	const starts = data.starts_at.replace("T", " ");
 	const priced = await priceLesson(sql, {
 		serviceId: data.service_id,
@@ -1804,15 +1805,16 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	}
 	// Coaches are players. This account may be the student on the lesson it logs.
 	const sql = await getSql();
+	const player = (await sql`
+      select user_id, display_name, guardian_user_id from profiles where user_id = ${data.player_user_id} limit 1
+    `)[0];
+	if (!player) throw new Error("Pick a student profile. A loose name is not on the schedule.");
+	await assertCoachCanSchedulePlayer(sql, context.userId, data.player_user_id);
 	await sql`update profiles set is_coach = true, updated_at = now() where user_id = ${context.userId}`;
 	await sql`
       insert into coach_profiles (user_id) values (${context.userId})
       on conflict do nothing
     `;
-	const player = (await sql`
-      select user_id, display_name, guardian_user_id from profiles where user_id = ${data.player_user_id} limit 1
-    `)[0];
-	if (!player) throw new Error("Pick a student profile. A loose name is not on the schedule.");
 	const starts = data.starts_at.replace("T", " ");
 	const priced = await priceLesson(sql, {
 		serviceId: data.service_id,
@@ -1845,23 +1847,22 @@ export const logLesson = createServerFn({ method: "POST" }).middleware([authMidd
 	}
 	await stampNewLessons(sql, ids, data.timezone, openEnded);
 	await connectCoach(sql, data.player_user_id, context.userId);
-	const playerName = String(player.display_name ?? "A student");
 	const title = openEnded ? "Standing lesson" : weeks > 1 ? `Recurring lesson · ${weeks} weeks` : "Lesson on the books";
 	const body = openEnded
 		? "Your coach put a standing lesson on the board. It keeps the next 12 weeks filled."
 		: "Your coach put a lesson on the board.";
-	if (!isAccountlessStudent(data.player_user_id)) {
-		await notify(sql, data.player_user_id, title, body, "/app/coaches");
-	}
-	const guardianId = player.guardian_user_id == null ? "" : String(player.guardian_user_id);
-	if (guardianId && guardianId !== context.userId) {
-		await notify(sql, guardianId, title, `${playerName} has a lesson on the board.`, "/app/desk");
-	}
-	const mailTarget = isAccountlessStudent(data.player_user_id) ? guardianId : data.player_user_id;
-	await deliverLessonEmail(sql, mailTarget, {
-		kind: "confirm",
-		whenLabel: formatWall(starts),
-		detail: body,
+	await deliverLessonNotice(sql, {
+		recipientId: data.player_user_id,
+		playerId: data.player_user_id,
+		actorId: context.userId,
+		title,
+		body,
+		href: "/app/coaches",
+		mail: {
+			kind: "confirm",
+			whenLabel: formatWall(starts),
+			detail: body,
+		},
 	});
 	return { ok: true };
 });
@@ -2075,11 +2076,15 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 	await sql`update lessons set status = ${data.status} where id = ${data.id}`;
 	const whenLabel = formatWall(lesson.starts_at == null ? null : String(lesson.starts_at));
 	if (data.status === "confirmed") {
-		await notify(sql, player, "Lesson confirmed", `Your ${lesson.sport} lesson is on the board.`, "/app/coaches");
-		await deliverLessonEmail(sql, player, {
-			kind: "confirm",
-			whenLabel,
-			detail: `Your ${lesson.sport} lesson is on the board.`,
+		const detail = `Your ${lesson.sport} lesson is on the board.`;
+		await deliverLessonNotice(sql, {
+			recipientId: player,
+			playerId: player,
+			actorId: context.userId,
+			title: "Lesson confirmed",
+			body: detail,
+			href: "/app/coaches",
+			mail: { kind: "confirm", whenLabel, detail },
 		});
 	}
 	else if (data.status === "declined") await notify(sql, player, "Lesson declined", "The coach declined that time. Try another window.", "/app/coaches");
@@ -2167,11 +2172,15 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
 		);
 	} else if (data.status === "cancelled") {
 		const other = context.userId === coach ? player : coach;
-		await notify(sql, other, "Lesson cancelled", "A lesson came off the board.", "/app/desk");
-		await deliverLessonEmail(sql, other, {
-			kind: "cancel",
-			whenLabel,
-			detail: "A lesson came off the board.",
+		const detail = "A lesson came off the board.";
+		await deliverLessonNotice(sql, {
+			recipientId: other,
+			playerId: player,
+			actorId: context.userId,
+			title: "Lesson cancelled",
+			body: detail,
+			href: "/app/desk",
+			mail: { kind: "cancel", whenLabel, detail },
 		});
 	}
 	return { ok: true };

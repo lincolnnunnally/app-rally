@@ -106,6 +106,19 @@ export function addCoachId(ids: readonly string[], coachId: string) {
   return uniqueIds([...ids, coachId]);
 }
 
+export const NOT_ON_ROSTER = "That player is not on your roster.";
+
+/** A coach may schedule a rostered student, or themselves. */
+export function canCoachSchedulePlayer(opts: {
+  coachId: string;
+  playerId: string;
+  coachUserIds: unknown;
+}): boolean {
+  if (!opts.coachId || !opts.playerId) return false;
+  if (opts.playerId === opts.coachId) return true;
+  return parseCoachIds(opts.coachUserIds).includes(opts.coachId);
+}
+
 export function parsePublicFields(raw: unknown): OptionalPublicField[] {
   if (raw == null) return [...DEFAULT_PUBLIC_FIELDS];
   const text = String(raw).trim();

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
-import { LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
+import { CancelLessonButton, LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
 import {
   CopyClaimLink,
   FinishStudentForm,
@@ -248,13 +248,7 @@ function Desk() {
                         >
                           Check out
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setStatus.mutate({ id: l.id, status: "cancelled" })}
-                        >
-                          Cancel
-                        </Button>
+                        <CancelLessonButton lessonId={l.id} />
                       </div>
                     </div>
                     <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />

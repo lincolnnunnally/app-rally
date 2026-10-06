@@ -322,6 +322,53 @@ export function lessonCameOff(opts: {
   return reason ? `${line} ${reason}` : line;
 }
 
+/** Coach opens the desk to confirm. The email still links to the lesson. */
+export function lessonRequestNotice(opts: {
+  whenLabel: string;
+  playerName?: string | null;
+  coachName?: string | null;
+  sport: string;
+  span?: string;
+}): ScheduleNotice {
+  const span = opts.span ?? "";
+  return {
+    userId: "",
+    title: "Lesson request",
+    body: `${opts.whenLabel}: ${noticeName(opts.playerName, "A player")} asked ${noticeName(opts.coachName, "Coach")} for ${opts.sport}${span}.`,
+    href: "/app/desk",
+  };
+}
+
+/** Confirmed lessons open the lesson, never the coach list. */
+export function lessonConfirmNotice(opts: {
+  lessonId: number;
+  whenLabel: string;
+  coachName?: string | null;
+  playerName?: string | null;
+  title?: string;
+}): ScheduleNotice {
+  return {
+    userId: "",
+    title: opts.title ?? "Lesson confirmed",
+    body: lessonOnBoard(opts),
+    href: `/app/lessons/${opts.lessonId}`,
+  };
+}
+
+export function lessonDeclineNotice(opts: {
+  lessonId: number;
+  whenLabel: string;
+  coachName?: string | null;
+  playerName?: string | null;
+}): ScheduleNotice {
+  return {
+    userId: "",
+    title: "Lesson declined",
+    body: `${opts.whenLabel} with ${noticeName(opts.coachName, "Coach")} for ${noticeName(opts.playerName, "Player")} was declined. Try another window.`,
+    href: `/app/lessons/${opts.lessonId}`,
+  };
+}
+
 /** Players and guardians open the lesson. Coaches stay on the desk. */
 export function cancelNoticeHref(recipientId: string, coachId: string, lessonId: number): string {
   if (recipientId === coachId) return "/app/desk";

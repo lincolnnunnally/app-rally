@@ -2,7 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { LessonNotesEditor, LessonNotesRead, PrivateNotesEditor } from "@/components/lesson-notes";
-import { LessonScheduleActions } from "@/components/lesson-schedule";
+import { CancelLessonButton, LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoEditor, LessonVideoRead } from "@/components/lesson-video";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
@@ -143,13 +143,7 @@ function LessonScan() {
             >
               Check out
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setStatus.mutate("cancelled")}
-              disabled={setStatus.isPending}
-            >
-              Cancel
-            </Button>
+            <CancelLessonButton lessonId={l.id} size="default" variant="outline" />
           </div>
         ) : (
           <p className="mt-3 text-sm">This lesson is {lessonStatusLabel(l.status)}.</p>

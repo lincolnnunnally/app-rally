@@ -203,6 +203,8 @@ export function readLessonVideoDuration(file: File): Promise<number> {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     let settled = false;
+    // Closed over by `finish` before the timeout is armed, so this stays `let`.
+    // eslint-disable-next-line prefer-const -- assigned once, after `finish` is declared
     let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (err: Error | null, seconds?: number) => {
       if (settled) return;

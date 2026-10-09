@@ -19,7 +19,7 @@ import { useRally } from "@/lib/rally-context";
 export const Route = createFileRoute("/app/you")({ component: You });
 
 function You() {
-  const { profile } = useRally();
+  const { profile, isOwner } = useRally();
 
   return (
     <div className="px-5 py-8">
@@ -49,6 +49,21 @@ function You() {
       <div className="mt-8">
         <ShareRally code={profile.share_code} creditCents={profile.credit_cents} />
       </div>
+      {isOwner ? (
+        <div className="mt-8">
+          <Link to="/admin">
+            <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">
+              <UserRound className="size-5 text-primary" />
+              <div>
+                <div className="font-medium">Owner</div>
+                <div className="text-sm text-muted-foreground">
+                  Coaches, players, teams, and free access.
+                </div>
+              </div>
+            </Card>
+          </Link>
+        </div>
+      ) : null}
       <div className="mt-8 grid gap-3">
         <Link to="/app/mental" search={{ after: "court" }}>
           <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">

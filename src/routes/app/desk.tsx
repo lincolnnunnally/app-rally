@@ -42,6 +42,7 @@ import {
   priceLine,
   sportLabel,
 } from "@/lib/rally";
+import { redeemCoachCoupon } from "@/lib/coach-access-server";
 import {
   addLedgerEntry,
   deleteCoachService,
@@ -432,6 +433,7 @@ function Desk() {
           ) : (
             <Card className="h-40 animate-pulse bg-secondary" />
           )}
+          <RedeemCodeCard />
           <ServicesPanel
             services={desk.data?.services ?? []}
             roster={[...(desk.data?.roster ?? []), ...(desk.data?.credited ?? [])]}
@@ -460,6 +462,49 @@ function Desk() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function RedeemCodeCard() {
+  const [code, setCode] = useState("");
+  const redeem = useMutation({
+    mutationFn: () => redeemCoachCoupon({ data: { code } }),
+    onSuccess: () => {
+      toast.success("Code redeemed.");
+      setCode("");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <Card className="mt-6">
+      <h2 className="font-display text-xl">Free access code</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        If you were sent a code, redeem it once. This does not charge a card.
+      </p>
+      <form
+        className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          redeem.mutate();
+        }}
+      >
+        <div className="grid gap-2">
+          <Label htmlFor="redeem-code">Code</Label>
+          <Input
+            id="redeem-code"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            autoComplete="off"
+            maxLength={32}
+            required
+          />
+        </div>
+        <Button type="submit" className="sm:self-end" disabled={redeem.isPending}>
+          {redeem.isPending ? "Redeeming…" : "Redeem"}
+        </Button>
+      </form>
+    </Card>
   );
 }
 

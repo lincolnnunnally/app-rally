@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { LessonNotesRead } from "@/components/lesson-notes";
 import { LessonVideoRead } from "@/components/lesson-video";
+import { CoachPayToday } from "@/components/coach-pay-today";
 import { Badge } from "@/components/ui/badge";
 import { useRally } from "@/lib/rally-context";
 import { Card } from "@/components/ui/card";
@@ -64,6 +65,8 @@ function Today() {
           </Link>
         </Card>
       ) : null}
+
+      <CoachPayToday />
 
       {(myLessons.data ?? []).length > 0 ? (
         <Card className="mt-8">

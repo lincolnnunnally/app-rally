@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { rememberCoach, rememberRef } from "@/lib/rally";
 import { lookupShare } from "@/lib/rally-server";
+import { coachProfilePath, coachRequestAppPath } from "@/lib/coach-links";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/join")({
@@ -55,7 +56,7 @@ function Join() {
   }, [ref, coach, asCoach]);
 
   return (
-    <PublicChrome>
+    <PublicChrome joinSearch={{ ref: invite, coach: coach || (asCoach ? ref : undefined) }}>
       <main className="mx-auto max-w-lg px-5 pb-16">
         <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Join</p>
         <h1 className="mt-2 font-display text-4xl">
@@ -86,29 +87,42 @@ function Join() {
             </div>
             {asCoach ? (
               <p className="mt-4 text-sm text-muted-foreground">
-                After you join, request a lesson for you or your kid. Court: Ed Smith Complex
-                (Smith Park / Vidalia Rec).
+                After you join, request a lesson for you or your kid. Court: Ed Smith Complex (Smith
+                Park / Vidalia Rec).
               </p>
             ) : (
               <p className="mt-4 text-sm text-muted-foreground">
-                When you join from this link, they get a share credit if a fee later moves — Rec at $0
-                still stays $0.
+                When you join from this link, they get a share credit if a fee later moves — Rec at
+                $0 still stays $0.
               </p>
             )}
           </Card>
         ) : null}
         <div className="mt-8 flex flex-wrap gap-2">
-          {user ? (
+          {user && asCoach && invite ? (
             <Button asChild>
+              <a href={coachRequestAppPath(invite)}>Request a lesson</a>
+            </Button>
+          ) : null}
+          {user ? (
+            <Button asChild variant={asCoach && invite ? "secondary" : "default"}>
               <Link to="/app">Open Rally</Link>
             </Button>
           ) : (
             <Button asChild>
-              <Link to="/login" search={{ ref: invite, mode: "up", coach: coach || (asCoach ? ref : undefined) }}>
+              <Link
+                to="/login"
+                search={{ ref: invite, mode: "up", coach: coach || (asCoach ? ref : undefined) }}
+              >
                 Create a player profile
               </Link>
             </Button>
           )}
+          {asCoach && invite ? (
+            <Button asChild variant="outline">
+              <a href={coachProfilePath(invite)}>See {who?.display_name}&apos;s profile</a>
+            </Button>
+          ) : null}
           <Button asChild variant="outline">
             <Link to="/where">Find your court</Link>
           </Button>

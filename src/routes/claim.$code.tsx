@@ -50,8 +50,7 @@ function ClaimPage() {
 
   const student = lookup.data;
   const mine = (household.data?.children ?? []).find((child) => child.claim_code === code) as
-    | (HouseholdChild & { claim_code: string | null })
-    | undefined;
+    (HouseholdChild & { claim_code: string | null }) | undefined;
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["household"] });
   };
@@ -64,12 +63,16 @@ function ClaimPage() {
           <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
         ) : lookup.isError ? (
           <p className="mt-4 text-sm text-destructive">
-            {lookup.error instanceof Error ? lookup.error.message : "Could not open this claim link."}
+            {lookup.error instanceof Error
+              ? lookup.error.message
+              : "Could not open this claim link."}
           </p>
         ) : !student ? (
           <>
             <h1 className="mt-2 font-display text-4xl">This link is not valid</h1>
-            <p className="mt-3 text-sm text-muted-foreground">Ask the coach for a new claim link.</p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Ask the coach for a new claim link.
+            </p>
           </>
         ) : (
           <>
@@ -78,7 +81,8 @@ function ClaimPage() {
               {student.coach_name
                 ? `${student.coach_name} added ${student.display_name} on Rally.`
                 : `${student.display_name} is on Rally.`}{" "}
-              Claim them, finish the profile, and schedule the next lesson. Coach notes stay with the coach.
+              Claim them, finish the profile, and schedule the next lesson. Coach notes stay with
+              the coach.
             </p>
             <Card className="mt-6">
               {isPending ? (
@@ -87,7 +91,12 @@ function ClaimPage() {
                 <Button asChild>
                   <Link
                     to="/login"
-                    search={{ mode: "up", ref: undefined, coach: undefined }}
+                    search={{
+                      mode: "up",
+                      ref: undefined,
+                      coach: undefined,
+                      next: `/claim/${code}`,
+                    }}
                     onClick={() => rememberAppNext(`/claim/${code}`)}
                   >
                     Sign in to claim {student.display_name}
@@ -104,6 +113,7 @@ function ClaimPage() {
                       coaches={household.data?.coaches ?? []}
                       courts={household.data?.courts ?? []}
                       defaultChildId={mine.user_id}
+                      defaultCoachId={mine.coach_user_ids?.[0]}
                       onSaved={refresh}
                     />
                   </div>

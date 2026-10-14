@@ -4,24 +4,39 @@ import { RallyMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GROK_PROVIDERS, authClient, authEnabled, signIn, socialAuthEnabled } from "@/lib/auth/client";
+import {
+  GROK_PROVIDERS,
+  authClient,
+  authEnabled,
+  signIn,
+  socialAuthEnabled,
+} from "@/lib/auth/client";
 import { rallyResetRedirect } from "@/lib/auth/reset-redirect";
 import { runEmailSignIn } from "@/lib/auth/sign-in-outcome";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { applyLoginCoachAttribution, consumeAppNext, peekAppNext, rememberRef } from "@/lib/rally";
+import {
+  applyLoginCoachAttribution,
+  consumeAppNext,
+  peekAppNext,
+  rememberRef,
+  safeAppNext,
+} from "@/lib/rally";
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { ref?: string; coach?: string; mode?: "up" | "in"; next?: string } => ({
     ref: typeof s.ref === "string" ? s.ref : undefined,
     coach: typeof s.coach === "string" ? s.coach : undefined,
     mode: s.mode === "up" || s.mode === "in" ? s.mode : undefined,
+    next: typeof s.next === "string" ? safeAppNext(s.next) : undefined,
   }),
   component: Login,
 });
 
 function Login() {
   const { user } = useCurrentUserState();
-  const { ref, coach, mode: modeSearch } = Route.useSearch();
+  const { ref, coach, mode: modeSearch, next: nextSearch } = Route.useSearch();
   const [mode, setMode] = useState<"in" | "up">(modeSearch === "in" ? "in" : "up");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -37,9 +52,13 @@ function Login() {
   }, [ref, coach]);
 
   if (user) {
-    const next = peekAppNext();
+    const next = nextSearch ?? peekAppNext();
     if (next?.startsWith("/claim/")) {
       return <Navigate to="/claim/$code" params={{ code: next.slice("/claim/".length) }} />;
+    }
+    if (next && next !== "/app" && typeof window !== "undefined") {
+      window.location.replace(next);
+      return null;
     }
     return <Navigate to="/app" />;
   }
@@ -49,7 +68,8 @@ function Login() {
     setError(null);
     setBusy(true);
     try {
-      const dest = consumeAppNext() ?? "/app";
+      const stored = consumeAppNext();
+      const dest = nextSearch ?? stored ?? "/app";
       const fallback = mode === "up" ? "Could not create account" : "Could not sign in";
       const result = await runEmailSignIn({
         dest,
@@ -97,7 +117,9 @@ function Login() {
       };
       const requestReset = client.requestPasswordReset ?? client.forgetPassword;
       if (!requestReset) {
-        setError("Password reset is not available in this build. Write lincoln@unitedundergod.org.");
+        setError(
+          "Password reset is not available in this build. Write lincoln@unitedundergod.org.",
+        );
         return;
       }
       const res = await requestReset({
@@ -128,13 +150,14 @@ function Login() {
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-sm">
-        <Link to="/" className="mb-8 flex items-center gap-2 text-muted-foreground hover:text-foreground">
+        <Link
+          to="/"
+          className="mb-8 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+        >
           <RallyMark className="size-8" />
           <span className="font-display text-2xl text-foreground">Rally</span>
         </Link>
-        <h1 className="font-display text-3xl">
-          {mode === "in" ? "Sign in" : "Create an account"}
-        </h1>
+        <h1 className="font-display text-3xl">{mode === "in" ? "Sign in" : "Create an account"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Same account for players and coaches. Tennis and pickleball, each on their own card.
         </p>

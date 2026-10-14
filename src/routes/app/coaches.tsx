@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import type { CoachCard, Court } from "@/lib/rally";
@@ -30,30 +30,43 @@ import { formatWall, money, priceLine, sportLabel, unitLabel } from "@/lib/rally
 import { ReviewBlock } from "@/components/reviews";
 import { listCoaches, listMyLessons, requestLesson } from "@/lib/rally-server";
 import { listHousehold } from "@/lib/students-server";
+import { getPublicCoach } from "@/lib/coach-public-server";
 
 type Fit = "all" | "beginner" | "stalled" | "juniors";
 
 export const Route = createFileRoute("/app/coaches")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    fit: s.fit === "beginner" || s.fit === "stalled" || s.fit === "juniors" ? (s.fit as Fit) : "all",
+  validateSearch: (s: Record<string, unknown>): { fit: Fit; coach?: string } => ({
+    fit:
+      s.fit === "beginner" || s.fit === "stalled" || s.fit === "juniors" ? (s.fit as Fit) : "all",
+    coach: typeof s.coach === "string" && s.coach.trim() ? s.coach.trim().slice(0, 32) : undefined,
   }),
   component: Coaches,
 });
 
 function Coaches() {
   const { profile, courts } = useRally();
-  const { fit } = Route.useSearch();
+  const { fit, coach: coachCode } = Route.useSearch();
+  const picked = useQuery({
+    queryKey: ["public-coach", coachCode],
+    queryFn: () => getPublicCoach({ data: { code: coachCode! } }),
+    enabled: !!coachCode,
+  });
+  const pickedId = picked.data?.user_id;
   const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => listCoaches() });
   const lessons = useQuery({ queryKey: ["my-lessons"], queryFn: () => listMyLessons() });
   const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
 
   const filtered = useMemo(() => {
     const list = coaches.data ?? [];
+    if (pickedId) return list.filter((c) => c.user_id === pickedId);
     if (fit === "beginner") return list.filter((c) => c.teaching_beginner);
-    if (fit === "stalled") return list.filter((c) => c.teaching_advanced || (c.specializations ?? "").toLowerCase().includes("plateau"));
+    if (fit === "stalled")
+      return list.filter(
+        (c) => c.teaching_advanced || (c.specializations ?? "").toLowerCase().includes("plateau"),
+      );
     if (fit === "juniors") return list.filter((c) => c.teaching_juniors);
     return list;
-  }, [coaches.data, fit]);
+  }, [coaches.data, fit, pickedId]);
 
   return (
     <div className="px-5 py-8">
@@ -73,9 +86,8 @@ function Coaches() {
         )}
       </div>
       <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-        Book a lesson for you or your kid. Pick Ed Smith Complex (Smith Park /
-        Vidalia Rec) as the court. The coach confirms. Recurring weeks stay on
-        both calendars.
+        Book a lesson for you or your kid. Pick Ed Smith Complex (Smith Park / Vidalia Rec) as the
+        court. The coach confirms. Recurring weeks stay on both calendars.
       </p>
 
       {(lessons.data ?? []).length > 0 ? (
@@ -118,13 +130,24 @@ function Coaches() {
         </div>
       ) : null}
 
+      {pickedId ? (
+        <p className="mt-6 text-sm text-muted-foreground">
+          Showing {picked.data?.display_name}.{" "}
+          <Link to="/app/coaches" search={{ fit: "all" }} className="underline">
+            See every coach
+          </Link>
+        </p>
+      ) : null}
+
       <div className="mt-6 flex flex-wrap gap-2">
-        {([
-          ["all", "Everyone"],
-          ["beginner", "I'm new"],
-          ["stalled", "I've stalled"],
-          ["juniors", "Juniors"],
-        ] as const).map(([v, label]) => (
+        {(
+          [
+            ["all", "Everyone"],
+            ["beginner", "I'm new"],
+            ["stalled", "I've stalled"],
+            ["juniors", "Juniors"],
+          ] as const
+        ).map(([v, label]) => (
           <Button key={v} size="sm" variant={fit === v ? "default" : "outline"} asChild>
             <Link to="/app/coaches" search={{ fit: v }}>
               {label}
@@ -153,6 +176,7 @@ function Coaches() {
             mine={c.user_id === profile.user_id}
             courts={courts}
             childrenRows={household.data?.children ?? []}
+            autoOpen={!!pickedId && c.user_id === pickedId}
           />
         ))}
       </div>
@@ -165,11 +189,13 @@ function CoachRow({
   mine,
   courts,
   childrenRows,
+  autoOpen = false,
 }: {
   coach: CoachCard;
   mine: boolean;
   courts: Court[];
   childrenRows: { user_id: string; display_name: string }[];
+  autoOpen?: boolean;
 }) {
   return (
     <Card>
@@ -183,7 +209,11 @@ function CoachRow({
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {c.headline || c.city}
-            {c.from_cents != null ? ` · from ${money(c.from_cents)}` : c.hourly_rate != null ? ` · from $${c.hourly_rate}` : ""}
+            {c.from_cents != null
+              ? ` · from ${money(c.from_cents)}`
+              : c.hourly_rate != null
+                ? ` · from $${c.hourly_rate}`
+                : ""}
             {c.years_coaching != null ? ` · ${c.years_coaching} yrs` : ""}
             {c.playing_level ? ` · plays ${c.playing_level}` : ""}
           </p>
@@ -199,9 +229,7 @@ function CoachRow({
           ) : c.bio ? (
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.bio}</p>
           ) : null}
-          {c.specializations ? (
-            <p className="mt-2 text-sm">{c.specializations}</p>
-          ) : null}
+          {c.specializations ? <p className="mt-2 text-sm">{c.specializations}</p> : null}
           <ProofDisplay certs={c.certs} honors={c.honors} />
           {c.students.length > 0 ? (
             <div className="mt-4 border-t border-border pt-3">
@@ -220,7 +248,10 @@ function CoachRow({
           {c.services.length > 0 ? (
             <ul className="mt-3 flex flex-col gap-1 text-sm">
               {c.services.map((s) => (
-                <li key={s.id} className="flex justify-between gap-3 border-t border-border pt-1 first:border-0 first:pt-0">
+                <li
+                  key={s.id}
+                  className="flex justify-between gap-3 border-t border-border pt-1 first:border-0 first:pt-0"
+                >
                   <span>
                     {s.name}
                     <span className="text-muted-foreground"> · {sportLabel(s.sport)}</span>
@@ -230,10 +261,12 @@ function CoachRow({
               ))}
             </ul>
           ) : null}
-          {!mine ? <ReviewBlock subjectType="coach" subjectId={c.user_id} noun={c.display_name} /> : null}
+          {!mine ? (
+            <ReviewBlock subjectType="coach" subjectId={c.user_id} noun={c.display_name} />
+          ) : null}
         </div>
         {!mine ? (
-          <BookDialog coach={c} courts={courts} childrenRows={childrenRows} />
+          <BookDialog coach={c} courts={courts} childrenRows={childrenRows} autoOpen={autoOpen} />
         ) : null}
       </div>
     </Card>
@@ -244,13 +277,18 @@ function BookDialog({
   coach,
   courts,
   childrenRows,
+  autoOpen = false,
 }: {
   coach: CoachCard;
   courts: Court[];
   childrenRows: { user_id: string; display_name: string }[];
+  autoOpen?: boolean;
 }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
   const [playerId, setPlayerId] = useState("me");
   const tennisCourt = courts.find(
     (c) => c.status === "open" && !c.is_other && c.sports.includes("tennis"),
@@ -289,14 +327,17 @@ function BookDialog({
             const f = new FormData(e.currentTarget);
             const serviceId = f.get("service_id") ? Number(f.get("service_id")) : undefined;
             const svc = coach.services.find((s) => s.id === serviceId);
+            const note = String(f.get("notes") || "").trim();
             book.mutate({
               coach_user_id: coach.user_id,
               player_user_id: playerId === "me" ? undefined : playerId,
-              sport: (svc?.sport as "pickleball" | "tennis") || (String(f.get("sport")) as "pickleball" | "tennis"),
+              sport:
+                (svc?.sport as "pickleball" | "tennis") ||
+                (String(f.get("sport")) as "pickleball" | "tennis"),
               starts_at: String(f.get("starts_at")),
               duration_min: Number(f.get("duration_min")),
               court_id: Number(f.get("court_id")),
-              notes: String(f.get("notes") || "") || undefined,
+              notes: note ? `From the player: ${note}` : undefined,
               service_id: serviceId,
               recur_weeks: Number(f.get("recur_weeks") || 1),
               open_ended: f.get("open_ended") === "on",
@@ -318,7 +359,12 @@ function BookDialog({
           ) : (
             <div className="flex flex-col gap-1.5">
               <Label>Sport</Label>
-              <Select name="sport" defaultValue={coach.plays_tennis && !coach.plays_pickleball ? "tennis" : "pickleball"}>
+              <Select
+                name="sport"
+                defaultValue={
+                  coach.plays_tennis && !coach.plays_pickleball ? "tennis" : "pickleball"
+                }
+              >
                 <option value="pickleball">Pickleball</option>
                 <option value="tennis">Tennis</option>
               </Select>
@@ -336,7 +382,8 @@ function BookDialog({
             </Select>
             {childrenRows.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Register a child on the desk if this lesson is for them. A typed name is not a profile.
+                Register a child on the desk if this lesson is for them. A typed name is not a
+                profile.
               </p>
             ) : null}
           </div>
@@ -392,10 +439,14 @@ function BookDialog({
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Notes</Label>
-            <Textarea name="notes" placeholder="Working on the third shot. 3.5 doubles. I'm stalled." />
+            <Label>Note to the coach</Label>
+            <Textarea
+              name="notes"
+              placeholder="Working on the third shot. 3.5 doubles. I'm stalled."
+            />
             <p className="text-xs text-muted-foreground">
-              Same notes the coach edits as the session + weekly practice cue after they confirm.
+              Shown to the coach marked &ldquo;From the player&rdquo;. The coach can replace it with
+              session notes after the lesson.
             </p>
           </div>
           <Button type="submit" disabled={book.isPending}>

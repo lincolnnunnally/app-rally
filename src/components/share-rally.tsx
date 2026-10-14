@@ -14,14 +14,10 @@ import {
 } from "@/lib/pay-href";
 import { lessonScanPath } from "@/lib/lesson-status";
 import { RALLY, coachInvitePath, money, sharePath } from "@/lib/rally";
+import { CoachPublicLinks } from "@/components/public-coach";
+import { absoluteRallyUrl, coachBookPath } from "@/lib/coach-links";
 
-export function ShareRally({
-  code,
-  creditCents,
-}: {
-  code: string | null;
-  creditCents: number;
-}) {
+export function ShareRally({ code, creditCents }: { code: string | null; creditCents: number }) {
   const [copied, setCopied] = useState(false);
   if (!code) return null;
 
@@ -80,20 +76,17 @@ export function ShareRally({
   );
 }
 
-export function CoachInvite({
-  code,
-  coachName,
-}: {
-  code: string | null;
-  coachName: string;
-}) {
+export function CoachInvite({ code, coachName }: { code: string | null; coachName: string }) {
   const [copied, setCopied] = useState(false);
   if (!code) return null;
 
   const path = coachInvitePath(code);
-  const url = typeof window === "undefined" ? `https://rally.unitedundergod.org${path}` : `${window.location.origin}${path}`;
+  const url =
+    typeof window === "undefined"
+      ? `https://rally.unitedundergod.org${path}`
+      : `${window.location.origin}${path}`;
   const qrSrc = rallyQrSrc(url);
-  const textBody = `Join me on Rally for tennis at Ed Smith (Smith Park / Vidalia Rec). Create your profile here and you'll be on my coaching list — you can also find people to hit with: ${url}`;
+  const textBody = `Join me on Rally for tennis at Ed Smith (Smith Park / Vidalia Rec). Create your profile here and you'll be on my coaching list — you can also find people to hit with: ${url} — already on Rally? Request a lesson time here: ${absoluteRallyUrl(coachBookPath(code))}`;
 
   async function copy() {
     try {
@@ -127,39 +120,42 @@ export function CoachInvite({
   }
 
   return (
-    <Card>
-      <p className="text-xs tracking-widest text-muted-foreground uppercase">Invite players</p>
-      <h2 className="mt-2 font-display text-2xl">Your link and QR</h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Text this to a player, or print the QR. They create a profile, land on your coaching list,
-        and can still look for hitting partners. The kid does not need their own account — the
-        parent books for them.
-      </p>
-      <p className="mt-3 break-all font-mono text-sm">{url}</p>
-      <img
-        src={qrSrc}
-        alt={`QR code to join Rally with ${coachName}`}
-        width={240}
-        height={240}
-        className="mt-4 rounded-md border border-border bg-white p-2"
-      />
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={textMessage}>
-          Text the link
-        </Button>
-        <Button type="button" variant="secondary" onClick={() => void nativeShare()}>
-          Share
-        </Button>
-        <Button type="button" variant="outline" onClick={() => void copy()}>
-          {copied ? "Copied" : "Copy link"}
-        </Button>
-        <Button type="button" variant="ghost" asChild>
-          <a href={qrSrc} download={`${code}-rally-qr.png`} target="_blank" rel="noreferrer">
-            Save QR
-          </a>
-        </Button>
-      </div>
-    </Card>
+    <>
+      <Card>
+        <p className="text-xs tracking-widest text-muted-foreground uppercase">Invite players</p>
+        <h2 className="mt-2 font-display text-2xl">Your link and QR</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Text this to a player, or print the QR. They create a profile, land on your coaching list,
+          and can still look for hitting partners. The kid does not need their own account — the
+          parent books for them.
+        </p>
+        <p className="mt-3 break-all font-mono text-sm">{url}</p>
+        <img
+          src={qrSrc}
+          alt={`QR code to join Rally with ${coachName}`}
+          width={240}
+          height={240}
+          className="mt-4 rounded-md border border-border bg-white p-2"
+        />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" onClick={textMessage}>
+            Text the link
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => void nativeShare()}>
+            Share
+          </Button>
+          <Button type="button" variant="outline" onClick={() => void copy()}>
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+          <Button type="button" variant="ghost" asChild>
+            <a href={qrSrc} download={`${code}-rally-qr.png`} target="_blank" rel="noreferrer">
+              Save QR
+            </a>
+          </Button>
+        </div>
+      </Card>
+      <CoachPublicLinks code={code} />
+    </>
   );
 }
 
@@ -187,8 +183,8 @@ export function PayHandles({
       <p className="text-xs tracking-widest text-muted-foreground uppercase">Pay links</p>
       <h3 className="mt-2 font-display text-xl">Cash App and Venmo</h3>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Your handles. Pull up the QR on this screen — they open Cash App or Venmo. Rally
-        still does not take a card in the app.
+        Your handles. Pull up the QR on this screen — they open Cash App or Venmo. Rally still does
+        not take a card in the app.
       </p>
       <form
         className="mt-4 grid gap-3"
@@ -311,16 +307,12 @@ export function PayHandleShow({
   );
 }
 
-export function LessonScanQr({
-  lessonId,
-  label,
-}: {
-  lessonId: number;
-  label: string;
-}) {
+export function LessonScanQr({ lessonId, label }: { lessonId: number; label: string }) {
   const path = lessonScanPath(lessonId);
   const url =
-    typeof window === "undefined" ? `https://rally.unitedundergod.org${path}` : `${window.location.origin}${path}`;
+    typeof window === "undefined"
+      ? `https://rally.unitedundergod.org${path}`
+      : `${window.location.origin}${path}`;
   const qrSrc = rallyQrSrc(url);
   return (
     <div className="mt-3">

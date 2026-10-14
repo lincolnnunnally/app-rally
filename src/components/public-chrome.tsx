@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { ReactNode } from "react";
 
-export function PublicChrome({ children }: { children: ReactNode }) {
+export function PublicChrome({
+  children,
+  joinSearch,
+}: {
+  children: ReactNode;
+  joinSearch?: { ref?: string; coach?: string };
+}) {
   const { user, isPending } = useCurrentUserState();
 
   return (
@@ -28,7 +34,10 @@ export function PublicChrome({ children }: { children: ReactNode }) {
             </Button>
           ) : (
             <Button asChild>
-              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
+              <Link
+                to="/login"
+                search={{ ref: joinSearch?.ref, coach: joinSearch?.coach, mode: "up" }}
+              >
                 Join
               </Link>
             </Button>

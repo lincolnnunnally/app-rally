@@ -5,6 +5,7 @@ import { LessonNotesEditor, LessonNotesRead, PrivateNotesEditor } from "@/compon
 import { CancelLessonButton, LessonScheduleActions } from "@/components/lesson-schedule";
 import { LessonVideoEditor, LessonVideoRead } from "@/components/lesson-video";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
+import { LessonSuccesses } from "@/components/lesson-successes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -112,6 +113,8 @@ function LessonScan() {
           <LessonNotesRead notes={l.notes} />
         )}
       </Card>
+
+      <LessonSuccesses lessonId={l.id} />
 
       {role === "guardian" ? null : (
         <Card className="mt-6">

@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,13 @@ export function CopyClaimLink({ code, name }: { code: string; name: string }) {
       >
         {url}
       </Link>
-      <Button className="mt-2" type="button" size="sm" variant="secondary" onClick={() => void copy()}>
+      <Button
+        className="mt-2"
+        type="button"
+        size="sm"
+        variant="secondary"
+        onClick={() => void copy()}
+      >
         {copied ? "Copied" : "Copy claim link"}
       </Button>
     </div>
@@ -93,7 +99,13 @@ export function RegisterChildForm({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-export function FinishStudentForm({ child, onSaved }: { child: HouseholdChild; onSaved: () => void }) {
+export function FinishStudentForm({
+  child,
+  onSaved,
+}: {
+  child: HouseholdChild;
+  onSaved: () => void;
+}) {
   const publicSet = new Set(child.public_fields);
   const save = useMutation({
     mutationFn: (data: Parameters<typeof finishStudentProfile>[0]["data"]) =>
@@ -188,8 +200,16 @@ export function FinishStudentForm({ child, onSaved }: { child: HouseholdChild; o
         </p>
         <PublicCheck name="public_bio" label="Bio" defaultChecked={publicSet.has("bio")} />
         <PublicCheck name="public_levels" label="Levels" defaultChecked={publicSet.has("levels")} />
-        <PublicCheck name="public_ratings" label="DUPR and UTR" defaultChecked={publicSet.has("ratings")} />
-        <PublicCheck name="public_experience" label="Experience" defaultChecked={publicSet.has("experience")} />
+        <PublicCheck
+          name="public_ratings"
+          label="DUPR and UTR"
+          defaultChecked={publicSet.has("ratings")}
+        />
+        <PublicCheck
+          name="public_experience"
+          label="Experience"
+          defaultChecked={publicSet.has("experience")}
+        />
         <PublicCheck name="public_photo" label="Photo" defaultChecked={publicSet.has("photo")} />
         <PublicCheck
           name="public_availability"
@@ -209,18 +229,34 @@ export function ScheduleChildForm({
   coaches,
   courts,
   defaultChildId,
+  defaultCoachId,
   onSaved,
 }: {
   children: { user_id: string; display_name: string }[];
   coaches: { user_id: string; display_name: string }[];
   courts: { id: number; name: string }[];
   defaultChildId?: string;
+  defaultCoachId?: string;
   onSaved: () => void;
 }) {
   const qc = useQueryClient();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const startCoach =
+    defaultCoachId && coaches.some((c) => c.user_id === defaultCoachId)
+      ? defaultCoachId
+      : coaches.length === 1
+        ? coaches[0]!.user_id
+        : "";
   const save = useMutation({
     mutationFn: (data: Parameters<typeof requestLesson>[0]["data"]) => requestLesson({ data }),
-    onSuccess: () => {
+    onSuccess: (_r, vars) => {
+      const coachName =
+        coaches.find((c) => c.user_id === vars.coach_user_id)?.display_name ?? "The coach";
+      setSent(
+        `Request sent for ${vars.starts_at.replace("T", " ")}. ${coachName} confirms it on the desk.`,
+      );
+      formRef.current?.reset();
       toast.success("Request sent. The coach confirms it on the desk.");
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
@@ -233,10 +269,16 @@ export function ScheduleChildForm({
 
   return (
     <form
+      ref={formRef}
       className="mt-3 grid gap-3"
       onSubmit={(e) => {
         e.preventDefault();
+        setSent(null);
         const f = new FormData(e.currentTarget);
+        if (!f.get("coach_user_id")) {
+          toast.error("Pick the coach for this lesson.");
+          return;
+        }
         save.mutate({
           player_user_id: String(f.get("player_user_id")),
           coach_user_id: String(f.get("coach_user_id")),
@@ -248,7 +290,11 @@ export function ScheduleChildForm({
       }}
     >
       <Field label="Student">
-        <Select name="player_user_id" required defaultValue={defaultChildId ?? children[0]?.user_id}>
+        <Select
+          name="player_user_id"
+          required
+          defaultValue={defaultChildId ?? children[0]?.user_id}
+        >
           {children.map((child) => (
             <option key={child.user_id} value={child.user_id}>
               {child.display_name}
@@ -257,8 +303,12 @@ export function ScheduleChildForm({
         </Select>
       </Field>
       <Field label="Coach">
-        <Select name="coach_user_id" required defaultValue={coaches[0]?.user_id ?? ""}>
-          {coaches.length === 0 ? <option value="">No coach listed yet</option> : null}
+        <Select name="coach_user_id" required defaultValue={startCoach}>
+          {coaches.length === 0 ? (
+            <option value="">No coach listed yet</option>
+          ) : startCoach ? null : (
+            <option value="">Choose a coach</option>
+          )}
           {coaches.map((coach) => (
             <option key={coach.user_id} value={coach.user_id}>
               {coach.display_name}
@@ -292,6 +342,11 @@ export function ScheduleChildForm({
       <Button type="submit" size="sm" disabled={save.isPending || coaches.length === 0}>
         {save.isPending ? "Sending…" : "Schedule next lesson"}
       </Button>
+      {sent ? (
+        <p role="status" className="text-sm text-emerald-500">
+          {sent}
+        </p>
+      ) : null}
     </form>
   );
 }

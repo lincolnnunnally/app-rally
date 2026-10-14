@@ -2,6 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { sendLessonRequestNote } from "@/lib/lesson-request-note";
 import { useRally } from "@/lib/rally-context";
 import type { CoachCard, Court } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
@@ -295,7 +296,18 @@ function BookDialog({
   );
   const recCourt = courts.find((c) => c.status === "open" && !c.is_other && c.name.includes("Rec"));
   const book = useMutation({
-    mutationFn: (data: Parameters<typeof requestLesson>[0]["data"]) => requestLesson({ data }),
+    mutationFn: async ({
+      note,
+      ...data
+    }: Parameters<typeof requestLesson>[0]["data"] & { note?: string }) => {
+      await requestLesson({ data });
+      if (note) {
+        // The note goes to the coach as a notice, never into the shared session notes.
+        await sendLessonRequestNote({ data: { coach_user_id: data.coach_user_id, note } }).catch(
+          () => undefined,
+        );
+      }
+    },
     onSuccess: () => {
       toast.success("Request sent. The coach will confirm — you will see it on the board.");
       setOpen(false);
@@ -337,7 +349,7 @@ function BookDialog({
               starts_at: String(f.get("starts_at")),
               duration_min: Number(f.get("duration_min")),
               court_id: Number(f.get("court_id")),
-              notes: note ? `From the player: ${note}` : undefined,
+              note: note || undefined,
               service_id: serviceId,
               recur_weeks: Number(f.get("recur_weeks") || 1),
               open_ended: f.get("open_ended") === "on",
@@ -445,8 +457,8 @@ function BookDialog({
               placeholder="Working on the third shot. 3.5 doubles. I'm stalled."
             />
             <p className="text-xs text-muted-foreground">
-              Shown to the coach marked &ldquo;From the player&rdquo;. The coach can replace it with
-              session notes after the lesson.
+              Sent to the coach with your request. It is not added to the lesson&apos;s session
+              notes.
             </p>
           </div>
           <Button type="submit" disabled={book.isPending}>

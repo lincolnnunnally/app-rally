@@ -15,7 +15,7 @@ export const getLessonSuccesses = createServerFn({ method: "GET" })
     const row = (
       await sql`
         select l.coach_user_id, l.player_user_id, l.status, l.successes, p.guardian_user_id,
-               exists (select 1 from student_guardians sg where sg.student_id = l.player_user_id and sg.user_id = ${context.userId} and sg.revoked_at is null) as linked
+               exists (select 1 from student_guardian_links sg where sg.student_id = l.player_user_id and sg.user_id = ${context.userId} and sg.revoked_at is null) as linked
         from lessons l
         left join profiles p on p.user_id = l.player_user_id
         where l.id = ${data.id}
@@ -72,7 +72,7 @@ export const myCoachPayHandles = createServerFn({ method: "GET" })
       join coach_profiles c on c.user_id = l.coach_user_id
       left join profiles kid on kid.user_id = l.player_user_id
       where (l.player_user_id = ${context.userId} or kid.guardian_user_id = ${context.userId}
-             or exists (select 1 from student_guardians sg where sg.student_id = l.player_user_id and sg.user_id = ${context.userId} and sg.revoked_at is null))
+             or exists (select 1 from student_guardian_links sg where sg.student_id = l.player_user_id and sg.user_id = ${context.userId} and sg.revoked_at is null))
         and l.coach_user_id <> ${context.userId}
         and l.status in ('confirmed', 'checked_in', 'completed')
         and (coalesce(c.cash_app_handle, '') <> '' or coalesce(c.venmo_handle, '') <> '')
@@ -104,7 +104,7 @@ export const listGuardedKidLessons = createServerFn({ method: "GET" })
       where (
         kid.guardian_user_id = ${me}
         or exists (
-          select 1 from student_guardians sg
+          select 1 from student_guardian_links sg
           where sg.student_id = l.player_user_id and sg.user_id = ${me} and sg.revoked_at is null
         )
       )

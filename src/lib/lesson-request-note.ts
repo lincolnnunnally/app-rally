@@ -29,7 +29,7 @@ export const sendLessonRequestNote = createServerFn({ method: "POST" })
         left join profiles p on p.user_id = l.player_user_id
         where l.coach_user_id = ${data.coach_user_id}
           and l.status = 'requested'
-          and (l.player_user_id = ${me} or p.guardian_user_id = ${me} or exists (select 1 from student_guardians sg where sg.student_id = l.player_user_id and sg.user_id = ${me} and sg.revoked_at is null))
+          and (l.player_user_id = ${me} or p.guardian_user_id = ${me} or exists (select 1 from student_guardian_links sg where sg.student_id = l.player_user_id and sg.user_id = ${me} and sg.revoked_at is null))
           and l.created_at > now() - interval '15 minutes'
         order by l.id desc
         limit 1

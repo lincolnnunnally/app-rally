@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { LessonNotesRead } from "@/components/lesson-notes";
+import { LessonSuccesses } from "@/components/lesson-successes";
+import { MyKidsCard } from "@/components/my-kids";
 import { LessonVideoRead } from "@/components/lesson-video";
 import { CoachPayToday } from "@/components/coach-pay-today";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,8 @@ function Today() {
         {" · "}
         {profile.city}
       </p>
+
+      <MyKidsCard />
 
       <Card className="mt-8">
         <p className="text-xs tracking-widest text-muted-foreground uppercase">Journal</p>
@@ -88,6 +92,7 @@ function Today() {
                 <div className="mt-2">
                   <LessonNotesRead notes={l.notes} />
                 </div>
+                <LessonSuccesses lessonId={l.id} />
                 <div className="mt-2">
                   <LessonVideoRead hasVideo={l.has_video} />
                 </div>

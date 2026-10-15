@@ -59,7 +59,7 @@ export async function isGuardianOf(sql: Sql, actorId: string, studentId: string)
   const row = (await sql`
     select 1 as ok from profiles where user_id = ${studentId} and guardian_user_id = ${actorId}
     union all
-    select 1 as ok from student_guardians
+    select 1 as ok from student_guardian_links
     where student_id = ${studentId} and user_id = ${actorId} and revoked_at is null
     limit 1
   `)[0];
@@ -68,7 +68,7 @@ export async function isGuardianOf(sql: Sql, actorId: string, studentId: string)
 
 async function linkGuardian(sql: Sql, studentId: string, userId: string, relation: string, addedBy: string) {
   await sql`
-    insert into student_guardians (student_id, user_id, relation, added_by)
+    insert into student_guardian_links (student_id, user_id, relation, added_by)
     values (${studentId}, ${userId}, ${relation}, ${addedBy})
     on conflict (student_id, user_id) do update
       set relation = excluded.relation, revoked_at = null, added_by = excluded.added_by
@@ -125,7 +125,7 @@ export async function coachStudents(sql: Sql, coachId: string) {
         select g.student_id, g.user_id, g.relation, g.revoked_at is not null as revoked,
                coalesce(a.display_name, '') as name,
                (p.guardian_user_id = g.user_id) as is_primary
-        from student_guardians g
+        from student_guardian_links g
         join profiles p on p.user_id = g.student_id
         left join profiles a on a.user_id = g.user_id
         where g.student_id = any(${ids}::text[])
@@ -259,7 +259,7 @@ export const claimStudent = createServerFn({ method: "POST" })
       // Reused link: a different signed-in adult becomes an additional guardian. Once per user;
       // a guardian the coach revoked cannot re-add themselves with the link.
       const prior = (await sql`
-        select revoked_at from student_guardians where student_id = ${userId} and user_id = ${context.userId} limit 1
+        select revoked_at from student_guardian_links where student_id = ${userId} and user_id = ${context.userId} limit 1
       `)[0];
       if (prior && prior.revoked_at != null) throw new Error("Ask the coach to add you back.");
       if (prior) return { user_id: userId, display_name: displayName, linked: true };
@@ -338,7 +338,7 @@ export const coachRevokeGuardian = createServerFn({ method: "POST" })
       throw new Error("That is the primary guardian. Only extra guardians can be removed here.");
     }
     await sql`
-      update student_guardians set revoked_at = now()
+      update student_guardian_links set revoked_at = now()
       where student_id = ${data.student_id} and user_id = ${data.user_id} and revoked_at is null
     `;
     return { ok: true };
@@ -452,7 +452,7 @@ export const listHousehold = createServerFn({ method: "GET" })
         from profiles
         where guardian_user_id = ${context.userId}
            or user_id in (
-             select student_id from student_guardians
+             select student_id from student_guardian_links
              where user_id = ${context.userId} and revoked_at is null
            )
         order by display_name

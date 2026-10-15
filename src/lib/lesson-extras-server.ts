@@ -14,7 +14,8 @@ export const getLessonSuccesses = createServerFn({ method: "GET" })
     const sql = await getSql();
     const row = (
       await sql`
-        select l.coach_user_id, l.player_user_id, l.status, l.successes, p.guardian_user_id
+        select l.coach_user_id, l.player_user_id, l.status, l.successes, p.guardian_user_id,
+               exists (select 1 from student_guardian_links sg where sg.student_id = l.player_user_id and sg.user_id = ${context.userId} and sg.revoked_at is null) as linked
         from lessons l
         left join profiles p on p.user_id = l.player_user_id
         where l.id = ${data.id}
@@ -25,7 +26,9 @@ export const getLessonSuccesses = createServerFn({ method: "GET" })
     const me = context.userId;
     const isCoach = String(row.coach_user_id) === me;
     const allowed =
-      isCoach || String(row.player_user_id) === me || String(row.guardian_user_id ?? "") === me;
+      isCoach || String(row.player_user_id) === me || String(row.guardian_user_id ?? "") === me ||
+      row.linked === true ||
+      row.linked === "t";
     if (!allowed) return null;
     return {
       successes: row.successes == null ? null : String(row.successes),
@@ -68,7 +71,8 @@ export const myCoachPayHandles = createServerFn({ method: "GET" })
       join profiles p on p.user_id = l.coach_user_id
       join coach_profiles c on c.user_id = l.coach_user_id
       left join profiles kid on kid.user_id = l.player_user_id
-      where (l.player_user_id = ${context.userId} or kid.guardian_user_id = ${context.userId})
+      where (l.player_user_id = ${context.userId} or kid.guardian_user_id = ${context.userId}
+             or exists (select 1 from student_guardian_links sg where sg.student_id = l.player_user_id and sg.user_id = ${context.userId} and sg.revoked_at is null))
         and l.coach_user_id <> ${context.userId}
         and l.status in ('confirmed', 'checked_in', 'completed')
         and (coalesce(c.cash_app_handle, '') <> '' or coalesce(c.venmo_handle, '') <> '')
@@ -79,5 +83,42 @@ export const myCoachPayHandles = createServerFn({ method: "GET" })
       coach_name: String(r.display_name),
       cash_app_handle: r.cash_app_handle == null ? null : String(r.cash_app_handle),
       venmo_handle: r.venmo_handle == null ? null : String(r.venmo_handle),
+    }));
+  });
+
+/**
+ * Lessons for every kid this account guards (primary or linked guardian). Shared notes and
+ * successes only; private coach notes are never selected here.
+ */
+export const listGuardedKidLessons = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const me = context.userId;
+    const rows = await sql`
+      select l.id, l.player_user_id, l.starts_at::text as starts_at, l.status, l.notes, l.successes,
+             c.display_name as coach_name
+      from lessons l
+      join profiles kid on kid.user_id = l.player_user_id
+      left join profiles c on c.user_id = l.coach_user_id
+      where (
+        kid.guardian_user_id = ${me}
+        or exists (
+          select 1 from student_guardian_links sg
+          where sg.student_id = l.player_user_id and sg.user_id = ${me} and sg.revoked_at is null
+        )
+      )
+        and l.status in ('requested', 'confirmed', 'checked_in', 'completed')
+      order by l.starts_at desc
+      limit 40
+    `;
+    return rows.map((r) => ({
+      id: Number(r.id),
+      player_user_id: String(r.player_user_id),
+      starts_at: String(r.starts_at),
+      status: String(r.status),
+      notes: r.notes == null ? null : String(r.notes),
+      successes: r.successes == null ? null : String(r.successes),
+      coach_name: r.coach_name == null ? "Coach" : String(r.coach_name),
     }));
   });

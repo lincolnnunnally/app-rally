@@ -5,18 +5,15 @@ import { toast } from "sonner";
 import { useRally } from "@/lib/rally-context";
 import { LessonNotesEditor, PrivateNotesEditor } from "@/components/lesson-notes";
 import { CancelLessonButton, LessonScheduleActions, WeatherCancelForm } from "@/components/lesson-schedule";
-import {
-  CopyClaimLink,
-  FinishStudentForm,
-  RegisterChildForm,
-  ScheduleChildForm,
-} from "@/components/students";
+import { CopyClaimLink } from "@/components/students";
 import { LessonVideoEditor } from "@/components/lesson-video";
 import { defaultLessonWhen, LESSON_NOTES_HELP, LESSON_NOTES_LABEL } from "@/lib/lesson-notes";
 import { PRIVATE_NOTE_HELP, PRIVATE_NOTE_LABEL, rosterParentLine, scheduleStudents } from "@/lib/students";
-import { createStudent, listHousehold } from "@/lib/students-server";
+import { coachLinkGuardian, coachRevokeGuardian, createStudent } from "@/lib/students-server";
+import { rallyQrSrc } from "@/lib/pay-href";
+import { LessonSuccesses } from "@/components/lesson-successes";
 import { lessonIsOpen } from "@/lib/lesson-status";
-import { DEFAULT_LESSON_TIMEZONE, LESSON_TIMEZONES } from "@/lib/schedule";
+import { DEFAULT_LESSON_TIMEZONE } from "@/lib/schedule";
 import { withCoachAsPlayer } from "@/lib/lesson-video";
 import type { CertItem, CoachBilling, CoachService, Court, HonorItem, LessonRow, PlayerProof, Profile } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +27,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlayerProofBlock } from "@/components/player-proof";
 import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor } from "@/components/proof-lists";
-import { CoachInvite, LessonScanQr, PayHandleShow, PayHandles, ShareRally } from "@/components/share-rally";
+import { CheckInQr } from "@/components/checkin-qr";
+import { CoachInvite, PayHandleShow, PayHandles, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
   RALLY,
@@ -62,8 +60,7 @@ export const Route = createFileRoute("/app/desk")({ component: Desk });
 function Desk() {
   const { profile, courts } = useRally();
   const qc = useQueryClient();
-  const desk = useQuery({ queryKey: ["desk"], queryFn: () => getCoachDesk() });
-  const household = useQuery({ queryKey: ["household"], queryFn: () => listHousehold() });
+  const desk = useQuery({ queryKey: ["desk"], queryFn: () => getCoachDesk(), refetchInterval: 15000 });
   const [payFor, setPayFor] = useState<LessonRow | null>(null);
   const setStatus = useMutation({
     mutationFn: (data: {
@@ -103,6 +100,12 @@ function Desk() {
     );
   }, [desk.data?.students, profile.display_name, profile.user_id]);
   const [logPlayerId, setLogPlayerId] = useState<string | undefined>();
+  const [justLogged, setJustLogged] = useState<string | null>(null);
+  const justLoggedLesson = justLogged
+    ? [...upcoming]
+        .filter((l) => l.player_user_id === justLogged)
+        .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))[0]
+    : undefined;
 
   return (
     <div className="px-5 py-8">
@@ -149,9 +152,15 @@ function Desk() {
           <StudentsPanel students={desk.data?.students ?? []} onSaved={refreshDesk} />
           <div className="mt-8">
           <LogLessonForm
-            key={`${logPlayerId ?? "auto"}:${upcoming.length === 0 ? "empty" : "has"}`}
+            key={`${logPlayerId ?? "auto"}:${logPeople.length}:${upcoming.length === 0 ? "empty" : "has"}`}
             courts={courts}
             people={logPeople}
+            timezone={upcoming.find((l) => l.timezone)?.timezone ?? DEFAULT_LESSON_TIMEZONE}
+            onStudentAdded={(id) => {
+              setLogPlayerId(id);
+              refreshDesk();
+            }}
+            onLogged={(playerId) => setJustLogged(playerId)}
             services={desk.data?.services ?? []}
             defaultOpen={desk.isSuccess && upcoming.length === 0}
             defaultPlayerId={logPlayerId ?? completed[0]?.player_user_id}
@@ -161,6 +170,23 @@ function Desk() {
             }}
           />
           </div>
+
+          {justLoggedLesson ? (
+            <Card className="mt-6 border-primary/40">
+              <p className="text-xs tracking-widest text-primary uppercase">Just logged</p>
+              <h2 className="mt-1 font-display text-2xl">
+                {lessonWho(justLoggedLesson)} · {formatWall(justLoggedLesson.starts_at)}
+              </h2>
+              {justLoggedLesson.status === "checked_in" ? (
+                <p className="mt-2 text-sm font-medium text-primary">Checked in. Add notes in Upcoming below.</p>
+              ) : (
+                <CheckInQr lessonId={justLoggedLesson.id} label={`${lessonWho(justLoggedLesson)} lesson`} />
+              )}
+              <Button size="sm" variant="ghost" className="mt-2" onClick={() => setJustLogged(null)}>
+                Done
+              </Button>
+            </Card>
+          ) : null}
 
           <section className="mt-10">
             <h2 className="font-display text-2xl">Weather day</h2>
@@ -229,8 +255,8 @@ function Desk() {
                         {l.open_ended ? " · standing" : l.series_id ? " · recurring" : ""}
                         {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
                         {l.rally_take_cents > 0 ? ` · Rally ${money(l.rally_take_cents)}` : ""}
-                        {l.status === "checked_in" ? " · checked in" : ""}
                       </span>
+                      {l.status === "checked_in" ? <Badge variant="good">Checked in</Badge> : null}
                       <div className="flex flex-wrap gap-1">
                         {l.status === "confirmed" ? (
                           <Button
@@ -251,7 +277,13 @@ function Desk() {
                         <CancelLessonButton lessonId={l.id} />
                       </div>
                     </div>
-                    <LessonScanQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />
+                    {l.status === "checked_in" ? (
+                      <p className="mt-3 text-sm text-primary">
+                        Checked in. Write the session note, successes, and private note right here.
+                      </p>
+                    ) : (
+                      <CheckInQr lessonId={l.id} label={`${lessonWho(l)} lesson`} />
+                    )}
                     <LessonScheduleActions lesson={l} />
                     <div className="mt-3">
                       <Button size="sm" variant="secondary" asChild>
@@ -270,6 +302,7 @@ function Desk() {
                     <div className="mt-4 border-t border-border pt-3">
                       <LessonNotesEditor key={`${l.id}:${l.notes ?? ""}`} lessonId={l.id} notes={l.notes} />
                     </div>
+                    <LessonSuccesses lessonId={l.id} />
                     <div className="mt-4 border-t border-border pt-3">
                       <LessonVideoEditor
                         key={`${l.id}:video`}
@@ -413,12 +446,6 @@ function Desk() {
             ) : null}
           </section>
 
-          <HouseholdPanel
-            childrenRows={household.data?.children ?? []}
-            coaches={household.data?.coaches ?? []}
-            courts={household.data?.courts ?? []}
-            onSaved={refreshDesk}
-          />
         </TabsContent>
 
         <TabsContent value="listing" className="mt-6">
@@ -469,8 +496,14 @@ function LogLessonForm({
   services,
   defaultOpen = false,
   defaultPlayerId,
+  timezone,
+  onStudentAdded,
+  onLogged,
   onSaved,
 }: {
+  timezone: string;
+  onStudentAdded: (userId: string) => void;
+  onLogged: (playerId: string) => void;
   courts: Court[];
   people: { user_id: string; display_name: string }[];
   services: CoachService[];
@@ -487,8 +520,9 @@ function LogLessonForm({
   );
   const save = useMutation({
     mutationFn: (data: Parameters<typeof logLesson>[0]["data"]) => logLesson({ data }),
-    onSuccess: () => {
-      toast.success("Lesson on the books.");
+    onSuccess: (_, vars) => {
+      toast.success("Lesson on the books. Have them scan the QR to check in.");
+      onLogged(vars.player_user_id);
       setOpen(false);
       onSaved();
     },
@@ -507,15 +541,11 @@ function LogLessonForm({
     <Card>
       <h2 className="font-display text-xl">Log a lesson</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Pick a real student. Add them above if they are not listed yet. You are a
+        Pick a student, or add a new one right here. You are a
         player too — select yourself and this lesson also lands on Today. Confirmed
         as soon as you save it.
       </p>
-      {people.length <= 1 ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          No student profile yet. Add one, then they show up here.
-        </p>
-      ) : null}
+      <InlineAddStudent onAdded={onStudentAdded} />
       <form
         className="mt-4 grid gap-3"
         onSubmit={(e) => {
@@ -534,7 +564,7 @@ function LogLessonForm({
             service_id: serviceId,
             recur_weeks: Number(f.get("recur_weeks") || 1),
             open_ended: f.get("open_ended") === "on",
-            timezone: String(f.get("timezone") || DEFAULT_LESSON_TIMEZONE),
+            timezone: timezone || DEFAULT_LESSON_TIMEZONE,
             group_spots: f.get("group_spots") ? Number(f.get("group_spots")) : undefined,
           });
         }}
@@ -583,15 +613,6 @@ function LogLessonForm({
           Standing skips the 12-week cap and keeps the next 12 weeks on the board. Fixed series can
           Extend or Renew later.
         </p>
-        <Field label="Timezone">
-          <Select name="timezone" defaultValue={DEFAULT_LESSON_TIMEZONE}>
-            {LESSON_TIMEZONES.map((zone) => (
-              <option key={zone} value={zone}>
-                {zone}
-              </option>
-            ))}
-          </Select>
-        </Field>
         <Field label="When">
           <Input name="starts_at" type="datetime-local" required defaultValue={defaultLessonWhen()} />
         </Field>
@@ -640,134 +661,322 @@ function LogLessonForm({
   );
 }
 
-function StudentsPanel({
-  students,
-  onSaved,
-}: {
-  students: {
-    user_id: string;
-    display_name: string;
-    claim_code: string | null;
-    claimed: boolean;
-  }[];
-  onSaved: () => void;
-}) {
-  const save = useMutation({
-    mutationFn: (display_name: string) => createStudent({ data: { display_name } }),
-    onSuccess: (row) => {
-      toast.success(`${row.display_name} is a student. Copy the claim link.`);
+type RosterStudent = {
+  user_id: string;
+  display_name: string;
+  claim_code: string | null;
+  claimed: boolean;
+  guardian_user_id?: string | null;
+  guardians?: { user_id: string; name: string; relation: string; primary: boolean }[];
+};
+
+function StudentsPanel({ students, onSaved }: { students: RosterStudent[]; onSaved: () => void }) {
+  const revoke = useMutation({
+    mutationFn: (v: { student_id: string; user_id: string }) => coachRevokeGuardian({ data: v }),
+    onSuccess: () => {
+      toast.success("Guardian removed.");
       onSaved();
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
+  const [qrFor, setQrFor] = useState<string | null>(null);
+  const [linkFor, setLinkFor] = useState<string | null>(null);
   return (
     <Card>
-      <h2 className="font-display text-xl">Students</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Add the person before they have an account. The schedule lists that profile.
-        One link lets a parent claim them.
+      <h2 className="font-display text-2xl">Your students ({students.length})</h2>
+      <ul className="mt-4 flex flex-col gap-3">
+        {students.length === 0 ? (
+          <li className="text-sm text-muted-foreground">No students yet. Add your first one below.</li>
+        ) : (
+          students.map((student) => {
+            const parentLine = rosterParentLine({ userId: student.user_id, claimed: student.claimed });
+            const accountless = parentLine === "waiting on a parent";
+            const guardians = student.guardians ?? [];
+            return (
+              <li key={student.user_id} className="rounded-md border border-border px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">{student.display_name}</p>
+                  {student.claimed ? (
+                    <Badge variant="good">Claimed</Badge>
+                  ) : accountless ? (
+                    <Badge variant="warn">Pending claim</Badge>
+                  ) : (
+                    <Badge variant="outline">Own account</Badge>
+                  )}
+                </div>
+                {guardians.length > 0 ? (
+                  <ul className="mt-1 flex flex-col gap-1">
+                    {guardians.map((g) => (
+                      <li key={g.user_id} className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {g.relation === "self" ? "Their own account" : `${g.relation}: ${g.name}`}
+                        {g.primary ? " (primary)" : null}
+                        {!g.primary ? (
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() => revoke.mutate({ student_id: student.user_id, user_id: g.user_id })}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : parentLine ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Parent: {parentLine}</p>
+                ) : null}
+                {student.claim_code ? (
+                  <div>
+                    <CopyClaimLink code={student.claim_code} name={student.display_name} />
+                    {student.claimed ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Already claimed. Another parent or grandparent can open this same link to join as a
+                        guardian.
+                      </p>
+                    ) : null}
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setQrFor(qrFor === student.user_id ? null : student.user_id)}
+                      >
+                        {qrFor === student.user_id ? "Hide QR" : "Show QR"}
+                      </Button>
+                      <ShareClaimButton code={student.claim_code} name={student.display_name} />
+                    </div>
+                    {qrFor === student.user_id ? <ClaimQr code={student.claim_code} name={student.display_name} /> : null}
+                  </div>
+                ) : !student.claimed && !accountless ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Connected from a lesson or invite.</p>
+                ) : null}
+                {student.user_id.startsWith("student:") ? (
+                  <div className="mt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setLinkFor(linkFor === student.user_id ? null : student.user_id)}
+                    >
+                      Link a guardian
+                    </Button>
+                    {linkFor === student.user_id ? (
+                      <LinkGuardianForm
+                        student={student}
+                        roster={students}
+                        onDone={() => {
+                          setLinkFor(null);
+                          onSaved();
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })
+        )}
+      </ul>
+      <div className="mt-6 border-t border-border pt-4">
+        <h3 className="font-display text-lg">Add student</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Add the person before they have an account. One link lets a parent claim them.
+        </p>
+        <AddStudentForm onAdded={() => onSaved()} />
+      </div>
+    </Card>
+  );
+}
+
+function claimUrl(code: string) {
+  const origin = typeof window === "undefined" ? "https://rally.unitedundergod.org" : window.location.origin;
+  return `${origin}/claim/${code}`;
+}
+
+function ClaimQr({ code, name }: { code: string; name: string }) {
+  return (
+    <img
+      src={rallyQrSrc(claimUrl(code))}
+      alt={`Claim QR for ${name}`}
+      width={220}
+      height={220}
+      className="mt-2 rounded-md border border-border bg-white p-2"
+    />
+  );
+}
+
+function ShareClaimButton({ code, name }: { code: string; name: string }) {
+  async function share() {
+    const url = claimUrl(code);
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `Claim ${name} on Rally`,
+          text: `Claim ${name}'s Rally profile so you can schedule and pay for lessons: ${url}`,
+          url,
+        });
+      } catch {
+        /* dismissed */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Could not copy.");
+    }
+  }
+  return (
+    <Button type="button" size="sm" variant="secondary" onClick={() => void share()}>
+      Share
+    </Button>
+  );
+}
+
+function LinkGuardianForm({
+  student,
+  roster,
+  onDone,
+}: {
+  student: RosterStudent;
+  roster: RosterStudent[];
+  onDone: () => void;
+}) {
+  const adults = roster.filter(
+    (r) =>
+      r.user_id !== student.user_id &&
+      (r.user_id.startsWith("student:") ? Boolean(r.guardian_user_id) : true),
+  );
+  const link = useMutation({
+    mutationFn: (v: { via_student_id: string; relation: "mother" | "father" | "grandmother" | "grandfather" | "guardian" }) =>
+      coachLinkGuardian({ data: { student_id: student.user_id, ...v } }),
+    onSuccess: () => {
+      toast.success(`Guardian linked to ${student.display_name}.`);
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (adults.length === 0) {
+    return (
+      <p className="mt-1 text-xs text-muted-foreground">
+        No claimed adult on your roster yet. Once they claim their own link, they show up here.
       </p>
+    );
+  }
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        link.mutate({
+          via_student_id: String(f.get("via")),
+          relation: String(f.get("relation")) as "grandmother",
+        });
+      }}
+    >
+      <Field label="Adult (their account)">
+        <Select name="via" required>
+          {adults.map((a) => (
+            <option key={a.user_id} value={a.user_id}>
+              {a.display_name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Relation">
+        <Select name="relation" defaultValue="grandmother">
+          <option value="mother">Mother</option>
+          <option value="father">Father</option>
+          <option value="grandmother">Grandmother</option>
+          <option value="grandfather">Grandfather</option>
+          <option value="guardian">Guardian</option>
+        </Select>
+      </Field>
+      <Button type="submit" size="sm" disabled={link.isPending}>
+        {link.isPending ? "Linking…" : `Link to ${student.display_name}`}
+      </Button>
+    </form>
+  );
+}
+
+function AddStudentForm({ onAdded }: { onAdded: (userId: string) => void }) {
+  const [sent, setSent] = useState<{ name: string; code: string; email: string } | null>(null);
+  const save = useMutation({
+    mutationFn: (v: { display_name: string; email: string }) =>
+      createStudent({ data: { display_name: v.display_name } }),
+    onSuccess: (row, vars) => {
+      toast.success(`${row.display_name} added. Share the claim link with a parent.`);
+      setSent({ name: row.display_name, code: row.claim_code, email: vars.email });
+      onAdded(row.user_id);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div>
       <form
-        className="mt-4 flex flex-wrap items-end gap-2"
+        className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
-          const name = String(new FormData(e.currentTarget).get("display_name") || "").trim();
-          if (!name) return;
-          save.mutate(name);
+          const f = new FormData(e.currentTarget);
+          const first = String(f.get("first_name") || "").trim();
+          const last = String(f.get("last_name") || "").trim();
+          if (!first) return;
+          save.mutate({
+            display_name: last ? `${first} ${last}` : first,
+            email: String(f.get("parent_email") || "").trim(),
+          });
           e.currentTarget.reset();
         }}
       >
-        <Field label="New student">
-          <Input name="display_name" required placeholder="Kaia" />
+        <Field label="First name">
+          <Input name="first_name" required placeholder="First name" />
+        </Field>
+        <Field label="Last name (optional)">
+          <Input name="last_name" placeholder="Last name" />
+        </Field>
+        <Field label="Parent email (optional)">
+          <Input name="parent_email" type="email" placeholder="parent@email.com" />
         </Field>
         <Button type="submit" disabled={save.isPending}>
           {save.isPending ? "Saving…" : "Add student"}
         </Button>
       </form>
-      <ul className="mt-4 flex flex-col gap-3">
-        {students.length === 0 ? (
-          <li className="text-sm text-muted-foreground">No students yet.</li>
-        ) : (
-          students.map((student) => {
-            const parentLine = rosterParentLine({ userId: student.user_id, claimed: student.claimed });
-            return (
-            <li key={student.user_id} className="rounded-md border border-border px-3 py-2">
-              <p className="text-sm">
-                {student.display_name}
-                {parentLine ? (
-                  <span className="text-muted-foreground"> · {parentLine}</span>
-                ) : null}
-              </p>
-              {student.claim_code ? (
-                <CopyClaimLink code={student.claim_code} name={student.display_name} />
-              ) : (
-                <p className="mt-1 text-xs text-muted-foreground">Connected from a lesson or invite.</p>
-              )}
-            </li>
-            );
-          })
-        )}
-      </ul>
-    </Card>
+      {sent ? (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <CopyClaimLink code={sent.code} name={sent.name} />
+          <div className="mt-1">
+            <ShareClaimButton code={sent.code} name={sent.name} />
+          </div>
+          {sent.email ? (
+            <p className="mt-1">Tap Share or Copy and send it to {sent.email}.</p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-function HouseholdPanel({
-  childrenRows,
-  coaches,
-  courts,
-  onSaved,
-}: {
-  childrenRows: {
-    user_id: string;
-    display_name: string;
-    city: string;
-    phone: string | null;
-    bio: string | null;
-    availability: string | null;
-    plays_tennis: boolean;
-    plays_pickleball: boolean;
-    tennis_level: string | null;
-    pickleball_level: string | null;
-    dupr: string | null;
-    utr: string | null;
-    experience: string | null;
-    public_fields: string[];
-    coach_user_ids: string[];
-  }[];
-  coaches: { user_id: string; display_name: string }[];
-  courts: { id: number; name: string }[];
-  onSaved: () => void;
-}) {
+function InlineAddStudent({ onAdded }: { onAdded: (userId: string) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <section className="mt-10">
-      <h2 className="font-display text-2xl">Your children</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Your account can hold more than one child. Finish a profile here, then schedule the next lesson.
-        Coach notes stay on the coach desk.
-      </p>
-      <Card className="mt-3">
-        <RegisterChildForm onSaved={onSaved} />
-        {childrenRows.map((child) => (
-          <div key={child.user_id} className="mt-6 border-t border-border pt-4">
-            <h3 className="font-display text-xl">{child.display_name}</h3>
-            <FinishStudentForm child={child} onSaved={onSaved} />
-          </div>
-        ))}
-        {childrenRows.length > 0 ? (
-          <div className="mt-6 border-t border-border pt-4">
-            <h3 className="font-display text-xl">Schedule the next lesson</h3>
-            <ScheduleChildForm
-              children={childrenRows}
-              coaches={coaches}
-              courts={courts}
-              onSaved={onSaved}
-            />
-          </div>
-        ) : null}
-      </Card>
-    </section>
+    <div className="mt-3">
+      {open ? (
+        <div className="rounded-md border border-border p-3">
+          <p className="text-sm font-medium">Add new student</p>
+          <AddStudentForm
+            onAdded={(id) => {
+              onAdded(id);
+            }}
+          />
+        </div>
+      ) : (
+        <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          + Add new student
+        </Button>
+      )}
+    </div>
   );
 }
 

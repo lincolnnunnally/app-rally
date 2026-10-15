@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Select } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PublicChrome } from "@/components/public-chrome";
 import {
@@ -38,10 +39,30 @@ function ClaimPage() {
     else consumeAppNext();
   }, [user, code]);
 
+  const [relation, setRelation] = useState<
+    "mother" | "father" | "grandmother" | "grandfather" | "guardian" | "self"
+  >("guardian");
+  const relationPicker = (
+    <label className="mb-3 flex flex-col gap-1 text-sm">
+      I am their
+      <Select value={relation} onChange={(e) => setRelation(e.target.value as typeof relation)}>
+        <option value="mother">Mother</option>
+        <option value="father">Father</option>
+        <option value="grandmother">Grandmother</option>
+        <option value="grandfather">Grandfather</option>
+        <option value="guardian">Guardian</option>
+        <option value="self">This is me (I am the student)</option>
+      </Select>
+    </label>
+  );
   const claim = useMutation({
-    mutationFn: () => claimStudent({ data: { code } }),
+    mutationFn: () => claimStudent({ data: { code, relation } }),
     onSuccess: (row) => {
-      toast.success(`${row.display_name} is on your account.`);
+      toast.success(
+        row.linked
+          ? `You are now a ${relation} for ${row.display_name}.`
+          : `${row.display_name} is on your account.`,
+      );
       void qc.invalidateQueries({ queryKey: ["claim", code] });
       void qc.invalidateQueries({ queryKey: ["household"] });
     },
@@ -119,11 +140,23 @@ function ClaimPage() {
                   </div>
                 </div>
               ) : student.claimed ? (
-                <p className="text-sm">This student is already claimed.</p>
+                <div>
+                  <p className="mb-3 text-sm">
+                    {student.display_name} already has a guardian. Join as another guardian so you can
+                    schedule and pay too.
+                  </p>
+                  {relationPicker}
+                  <Button onClick={() => claim.mutate()} disabled={claim.isPending}>
+                    {claim.isPending ? "Joining…" : `Join as ${relation}`}
+                  </Button>
+                </div>
               ) : (
-                <Button onClick={() => claim.mutate()} disabled={claim.isPending}>
-                  {claim.isPending ? "Claiming…" : `Claim ${student.display_name}`}
-                </Button>
+                <div>
+                  {relationPicker}
+                  <Button onClick={() => claim.mutate()} disabled={claim.isPending}>
+                    {claim.isPending ? "Claiming…" : `Claim ${student.display_name}`}
+                  </Button>
+                </div>
               )}
             </Card>
             {user ? (
@@ -134,7 +167,7 @@ function ClaimPage() {
                 </p>
                 <RegisterChildForm onSaved={refresh} />
                 <Button className="mt-4" variant="outline" asChild>
-                  <Link to="/app/desk">Open the desk</Link>
+                  <Link to="/app" hash="my-kids">Open My kids</Link>
                 </Button>
               </Card>
             ) : null}

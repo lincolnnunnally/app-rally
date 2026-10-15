@@ -50,6 +50,17 @@ function You() {
         <ShareRally code={profile.share_code} creditCents={profile.credit_cents} />
       </div>
       <div className="mt-8 grid gap-3">
+        <Link to="/app" hash="my-kids">
+          <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">
+            <Users className="size-5 text-primary" />
+            <div>
+              <div className="font-medium">My kids</div>
+              <div className="text-sm text-muted-foreground">
+                Add your child, finish their profile, schedule their lessons.
+              </div>
+            </div>
+          </Card>
+        </Link>
         <Link to="/app/mental" search={{ after: "court" }}>
           <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">
             <PenLine className="size-5 text-primary" />

@@ -51,7 +51,7 @@ function num(v: unknown) {
 function bool(v: unknown) {
 	return v === true || v === "t" || v === "true";
 }
-var sportZ = z.enum(["pickleball", "tennis"]);
+const sportZ = z.enum(["pickleball", "tennis"]);
 let seedLock: Promise<void> | null = null;
 async function ensureSeed(sql: Sql) {
 	if (!seedLock) seedLock = runSeed(sql).catch((err) => {
@@ -701,7 +701,7 @@ async function priceLesson(sql: Sql, opts: { durationMin: number; serviceId?: nu
 	let price = 0;
 	let billing = "hour";
 	let duration = opts.durationMin;
-	let serviceId = opts.serviceId ?? null;
+	const serviceId = opts.serviceId ?? null;
 	if (opts.serviceId) {
 		const svc = await sql`
       select price_cents, unit, duration_min from coach_services where id = ${opts.serviceId}
@@ -866,7 +866,7 @@ function mapService(r: Record<string, unknown>): CoachService {
 		visibility: String(r.visibility ?? "public") === "player" ? "player" : "public"
 	};
 }
-var profileInput = z.object({
+const profileInput = z.object({
 	display_name: z.string().trim().min(1).max(80),
 	city: z.string().trim().min(1).max(60).default("Vidalia"),
 	bio: z.string().max(600).optional(),
@@ -2619,7 +2619,7 @@ export const homeFeed = createServerFn({ method: "GET" }).middleware([authMiddle
 		}))
 	};
 });
-var courtSubmitZ = z.object({
+const courtSubmitZ = z.object({
 	name: z.string().trim().min(3).max(80),
 	address: z.string().trim().min(3).max(120),
 	city: z.string().trim().min(2).max(60).default("Vidalia"),

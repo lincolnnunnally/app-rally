@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { RallyWordmark } from "@/components/brand";
 import { UserButton } from "@/lib/auth/gates";
 import { noticeLessonId } from "@/lib/lesson-status";
+import { useRally } from "@/lib/rally-context";
 import { listNotices, markNoticesRead } from "@/lib/rally-server";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,7 @@ function isActive(pathname: string, to: string) {
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { isOwner } = useRally();
 
   return (
     <div className="min-h-dvh bg-background">
@@ -72,6 +74,11 @@ export function AppShell() {
           })}
         </nav>
         <div className="flex items-center gap-2">
+          {isOwner ? (
+            <Link to="/admin" className="text-sm text-muted-foreground hover:text-foreground">
+              Owner
+            </Link>
+          ) : null}
           <NoticeBell />
           <div className="hidden md:block">
             <UserButton />

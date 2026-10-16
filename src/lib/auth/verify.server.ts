@@ -1,5 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
-import { isOwnerEmail } from "../owner";
+import { isAppOwnerEmail } from "../owner";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured } from "./server";
 
@@ -101,7 +101,7 @@ export async function requireVerifiedUser(bearerToken?: string): Promise<Verifie
   }
   const user = await getSessionUser(bearerToken);
   if (!user) throw new UnauthorizedError();
-  return { id: user.id, email: user.email, isOwner: isOwnerEmail(user.email) };
+  return { id: user.id, email: user.email, isOwner: isAppOwnerEmail(user.email) };
 }
 
 export async function requireUserId(bearerToken?: string): Promise<string> {

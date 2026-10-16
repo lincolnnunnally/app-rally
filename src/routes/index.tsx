@@ -1,17 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import {
-  Calendar,
-  GraduationCap,
-  MapPin,
-  Trophy,
-  Users,
-} from "lucide-react";
 import { RallyWordmark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { catalogCities, catalogCity } from "@/lib/rally-server";
-import { DirectionsLink, FacilityThumb } from "@/components/facility-place";
 import { bookingLabel, citySlug, kindLabel, sportLabel } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
@@ -37,16 +28,21 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
+const MUTED = "text-[#bfc6bd]";
+const BTN = "h-[54px] px-7 text-base";
+
 function Home() {
   const { user, isPending } = useCurrentUserState();
   const { cities, courts } = Route.useLoaderData();
+  const listed = courts.filter((c) => c.slug).slice(0, 4);
+  const joinSearch = { ref: undefined, coach: undefined, mode: "up" as const };
 
   return (
-    <main className="min-h-dvh bg-background">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
+    <main className="min-h-dvh bg-background text-[18px]">
+      <header className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-5 py-5">
         <RallyWordmark />
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button asChild variant="ghost">
+        <div className="flex items-center justify-end gap-2">
+          <Button asChild variant="ghost" className="hidden sm:inline-flex">
             <Link to="/where">Find a court</Link>
           </Button>
           {isPending ? (
@@ -63,7 +59,7 @@ function Home() {
                 </Link>
               </Button>
               <Button asChild>
-                <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
+                <Link to="/login" search={joinSearch}>
                   Join
                 </Link>
               </Button>
@@ -72,7 +68,7 @@ function Home() {
         </div>
       </header>
 
-      <section className="relative mx-auto max-w-5xl overflow-hidden px-5 pt-10 pb-20 md:pt-20">
+      <section className="mx-auto grid max-w-6xl gap-10 px-5 pt-8 pb-16 md:pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -87,153 +83,147 @@ function Home() {
             }),
           }}
         />
-        <CourtLines />
-        <p className="text-xs font-medium tracking-[0.22em] text-muted-foreground uppercase">
-          Tennis · pickleball
-        </p>
-        <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[1.05] md:text-6xl">
-          Tennis and pickleball, in one place.
-        </h1>
-        <p className="mt-6 max-w-xl text-base text-muted-foreground md:text-lg">
-          Rally runs tennis and pickleball: find a court, reserve a window, get matched with people
-          at your skill level, book a coach, join a league. Recs, clubs, and schools are listed on
-          Rally. Find your court.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Button asChild size="lg">
-            <Link to="/where">Find a court</Link>
-          </Button>
-          {isPending ? (
-            <div className="h-12 w-36 animate-pulse rounded-md bg-secondary" />
-          ) : user ? (
-            <Button asChild size="lg" variant="outline">
-              <Link to="/app">Go to your board</Link>
+        <div>
+          <p className="text-sm font-semibold tracking-[0.22em] text-primary uppercase">Tennis · pickleball</p>
+          <h1 className="mt-4 font-display text-[44px] leading-[1.04] md:text-[64px]">
+            Tennis and pickleball, in one place.
+          </h1>
+          <p className={`mt-6 max-w-xl text-lg md:text-xl ${MUTED}`}>
+            Find a court, reserve a window, get matched with people at your skill level, book a
+            coach, join a league. Recs, clubs, and schools are listed on Rally.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg" className={BTN}>
+              <Link to="/where">Find a court</Link>
             </Button>
-          ) : (
-            <Button asChild size="lg" variant="outline">
-              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
-                Join Rally
-              </Link>
-            </Button>
-          )}
+            {isPending ? (
+              <div className="h-[54px] w-40 animate-pulse rounded-md bg-secondary" />
+            ) : user ? (
+              <Button asChild size="lg" variant="outline" className={BTN}>
+                <Link to="/app">Go to your board</Link>
+              </Button>
+            ) : (
+              <Button asChild size="lg" variant="outline" className={BTN}>
+                <Link to="/login" search={joinSearch}>
+                  Join Rally
+                </Link>
+              </Button>
+            )}
+          </div>
+        </div>
+        <figure className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/50">
+          <div className="flex h-8 items-center gap-1.5 bg-secondary px-3">
+            <i className="size-2.5 rounded-full bg-line" />
+            <i className="size-2.5 rounded-full bg-line" />
+            <i className="size-2.5 rounded-full bg-line" />
+            <span className={`ml-2 truncate text-xs ${MUTED}`}>A court page on Rally</span>
+          </div>
+          <img
+            src="/home-court.jpg"
+            alt="Rally court page for Ed Smith Complex — Tennis"
+            width={1280}
+            height={800}
+            fetchPriority="high"
+            className="block w-full"
+          />
+        </figure>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="mx-auto max-w-6xl px-5 py-16">
+          <h2 className="font-display text-4xl">How Rally works</h2>
+          <ol className="mt-8 grid gap-4 md:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <li key={s.title} className="rounded-xl border border-border bg-[#161b19] p-6">
+                <span className="font-display text-3xl text-primary">{i + 1}</span>
+                <h3 className="mt-3 font-display text-2xl">{s.title}</h3>
+                <p className={`mt-2 leading-relaxed ${MUTED}`}>{s.body}</p>
+              </li>
+            ))}
+          </ol>
+          <p className={`mt-6 ${MUTED}`}>If a facility charges $0, Rally takes $0.</p>
         </div>
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-5 py-16">
-          <h2 className="font-display text-3xl">What to expect</h2>
-          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-            Find the court you play, reserve a window, then partners, coaches, and leagues live on
-            the same board.
-          </p>
+        <div className="mx-auto max-w-6xl px-5 py-16">
+          <p className="text-sm font-semibold tracking-[0.2em] text-primary uppercase">Listed facilities</p>
+          <h2 className="mt-2 font-display text-4xl">
+            Courts near {cities.map((c) => c.city).join(" and ") || "you"}
+          </h2>
           <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {EXPECT.map((f) => (
-              <article key={f.title} className="rounded-xl border border-border bg-card p-6">
-                <f.icon className="size-5 text-primary" />
-                <h3 className="mt-4 font-display text-xl">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.body}</p>
+            {listed.map((c) => (
+              <article key={c.id} className="flex flex-col rounded-xl border border-border bg-[#161b19] p-6">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">{kindLabel(c.kind)}</Badge>
+                  {c.sports.split(",").map((s) => (
+                    <Badge key={s} variant="outline">{sportLabel(s.trim())}</Badge>
+                  ))}
+                  {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
+                </div>
+                <h3 className="mt-4 font-display text-2xl">{c.name}</h3>
+                <p className={`mt-1 ${MUTED}`}>{c.address}, {c.city}, GA</p>
+                <p className={`mt-1 ${MUTED}`}>{bookingLabel(c.booking_mode)}</p>
+                <Link
+                  to="/where/$city/$slug"
+                  params={{ city: citySlug(c.city), slug: c.slug! }}
+                  className="mt-4 inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline"
+                >
+                  View court →
+                </Link>
               </article>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-5 py-16">
-          <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Listed facilities</p>
-          <h2 className="mt-2 font-display text-3xl">Find the court you play</h2>
-          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-            {cities.map((c) => c.city).join(", ") || "Your city"} — public listings, no account to
-            read. If yours is missing, list it and Rally starts taking reservations.
-          </p>
-          <div className="mt-8 flex flex-col gap-3">
-            {courts
-              .filter((c) => c.slug)
-              .map((c) => (
-                <Card key={c.id} className="transition-colors duration-150 hover:border-primary/40">
-                  <div className="grid gap-4 sm:grid-cols-[14rem_1fr] sm:items-start">
-                    <FacilityThumb court={c} />
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          to="/where/$city/$slug"
-                          params={{ city: citySlug(c.city), slug: c.slug! }}
-                          className="font-display text-2xl hover:text-primary"
-                        >
-                          {c.name}
-                        </Link>
-                        <Badge variant="outline">{kindLabel(c.kind)}</Badge>
-                        {c.status === "coming" ? <Badge variant="warn">Coming online</Badge> : null}
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        <DirectionsLink
-                          court={c}
-                          className="underline decoration-border underline-offset-4 hover:text-foreground"
-                        >
-                          {c.address}, {c.city}, GA
-                        </DirectionsLink>
-                      </p>
-                      <p className="mt-2 text-sm">
-                        {c.sports.split(",").map((s) => sportLabel(s.trim())).join(" · ")} ·{" "}
-                        {bookingLabel(c.booking_mode)}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-            ))}
-          </div>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link to="/list-a-court">List a court</Link>
-            </Button>
-            <Button asChild variant="outline">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Button asChild variant="outline" className={BTN}>
               <Link to="/where">Browse by city</Link>
             </Button>
+            <Button asChild className={BTN}>
+              <Link to="/list-a-court">List a court</Link>
+            </Button>
           </div>
         </div>
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-5 py-16">
-          <h2 className="font-display text-3xl">If you run a rec, club, or school program</h2>
-          <p className="mt-3 max-w-xl text-muted-foreground">
-            List the courts. Rally posts open play and takes the reservation — or holds a window
-            for a call, if that is how you book. Listing does not require a paid plan.
-          </p>
-          <Button asChild className="mt-6">
-            <Link to="/list-a-court">List your courts</Link>
-          </Button>
+        <div className="mx-auto grid max-w-6xl gap-4 px-5 py-16 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-[#161b19] p-7">
+            <h2 className="font-display text-3xl">If you run a rec, club, or school program</h2>
+            <p className={`mt-3 ${MUTED}`}>
+              List the courts. Rally posts open play and takes the reservation, or holds a window
+              for a call if that is how you book. Listing does not require a paid plan.
+            </p>
+            <Button asChild className={`mt-6 ${BTN}`}>
+              <Link to="/list-a-court">List your courts</Link>
+            </Button>
+          </div>
+          <div className="rounded-xl border border-border bg-[#161b19] p-7">
+            <h2 className="font-display text-3xl">If you coach</h2>
+            <p className={`mt-3 ${MUTED}`}>
+              A menu, not one hourly rate. Players who credit you put results on your card.
+              Recurring lessons and the books live on your desk.
+            </p>
+            <Button asChild className={`mt-6 ${BTN}`}>
+              {user ? (
+                <Link to="/app/desk">Open a coach desk</Link>
+              ) : (
+                <Link to="/login" search={joinSearch}>
+                  Open a coach desk
+                </Link>
+              )}
+            </Button>
+          </div>
         </div>
       </section>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-5 py-16">
-          <h2 className="font-display text-3xl">If you coach</h2>
-          <p className="mt-3 max-w-xl text-muted-foreground">
-            A menu, not one hourly rate. Players who credit you put results on your card. Recurring
-            lessons and the books live on your desk. Rally records the split when a fee exists.
-            Card checkout is not on yet.
-          </p>
-          <Button asChild className="mt-6">
-            {user ? (
-              <Link to="/app/desk">Open a coach desk</Link>
-            ) : (
-              <Link to="/login" search={{ ref: undefined, coach: undefined, mode: "up" }}>
-                Open a coach desk
-              </Link>
-            )}
-          </Button>
-        </div>
-      </section>
-
-      <footer className="border-t border-border px-5 py-8 text-center text-xs text-muted-foreground">
+      <footer className={`border-t border-border px-5 py-8 text-center text-base ${MUTED}`}>
         Rally — tennis and pickleball. Eastern time on the board.
         {" · "}
-        <Link to="/privacy" className="hover:text-foreground">
+        <Link to="/privacy" className="inline-flex min-h-11 items-center hover:text-foreground">
           Privacy
         </Link>
         {" · "}
-        <Link to="/terms" className="hover:text-foreground">
+        <Link to="/terms" className="inline-flex min-h-11 items-center hover:text-foreground">
           Terms
         </Link>
       </footer>
@@ -241,45 +231,17 @@ function Home() {
   );
 }
 
-function CourtLines() {
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-y-0 right-[-10%] hidden w-1/2 md:block"
-    >
-      <div className="absolute inset-0 border-l border-line/40" />
-      <div className="absolute top-[12%] right-[18%] bottom-[12%] w-px bg-line/50" />
-      <div className="absolute top-1/2 right-[8%] left-0 h-px bg-line/40" />
-      <div className="absolute top-[28%] right-[8%] h-px w-1/2 bg-line/30" />
-      <div className="absolute top-[72%] right-[8%] h-px w-1/2 bg-line/30" />
-    </div>
-  );
-}
-
-const EXPECT = [
+const STEPS = [
   {
-    icon: MapPin,
-    title: "Find a listed court",
+    title: "Find a court",
     body: "Address, hours, who books it, fees and rules. Rec, club, school, or a court someone just added.",
   },
   {
-    icon: Calendar,
     title: "Reserve a window",
-    body: "Rally takes the reservation when the facility allows it. Or holds it as pending and you call. Walk-up stays walk-up.",
+    body: "Rally takes the reservation when the facility allows it, or holds it as pending and you call. Walk-up stays walk-up.",
   },
   {
-    icon: Users,
-    title: "Get matched by skill",
-    body: "Partners by DUPR, NTRP, years, and results. Open play that is posted, not a rumor in a chat.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Coaches and leagues",
-    body: "A menu of work, not one rate. Rosters and match nights. The stall board when the same shot keeps breaking.",
-  },
-  {
-    icon: Trophy,
-    title: "Money stays honest",
-    body: "If a facility charges $0, Rally takes $0. Splits are on the card when a fee actually moves.",
+    title: "Play at your level",
+    body: "Partners by DUPR, NTRP, years, and results. Coaches and leagues on the same board.",
   },
 ];

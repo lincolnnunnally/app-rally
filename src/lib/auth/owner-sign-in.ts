@@ -1,5 +1,5 @@
 import type { EnvLike } from "../owner.ts";
-import { isOwnerEmail } from "../owner.ts";
+import { isOwnerEmail, isReservedSignupEmail } from "../owner.ts";
 
 export function parseEmailPasswordBody(
   raw: string,
@@ -23,6 +23,40 @@ export function parseEmailPasswordBody(
   } catch {
     return {};
   }
+}
+
+/** Auth endpoints that would put a self-chosen email on a Rally account. */
+const EMAIL_CLAIMING_PATHS = ["/sign-up/email", "/change-email", "/update-user"];
+
+export function claimsEmail(pathname: string): boolean {
+  return EMAIL_CLAIMING_PATHS.some((p) => pathname.endsWith(p));
+}
+
+/** The address a sign-up / email-change body is trying to claim. */
+export function claimedEmail(raw: string, contentType: string | null): string | undefined {
+  try {
+    if ((contentType ?? "").includes("application/x-www-form-urlencoded")) {
+      const params = new URLSearchParams(raw);
+      return params.get("email") ?? params.get("newEmail") ?? undefined;
+    }
+    const body = JSON.parse(raw) as { email?: unknown; newEmail?: unknown };
+    if (typeof body.email === "string") return body.email;
+    if (typeof body.newEmail === "string") return body.newEmail;
+  } catch {
+    // unparseable bodies are left to Better Auth
+  }
+  return undefined;
+}
+
+/** Refuse self-registration (or email change) onto a reserved owner address. */
+export function shouldBlockReservedEmail(input: {
+  pathname: string;
+  raw: string;
+  contentType: string | null;
+  env?: EnvLike;
+}): boolean {
+  if (!claimsEmail(input.pathname)) return false;
+  return isReservedSignupEmail(claimedEmail(input.raw, input.contentType), input.env);
 }
 
 /**

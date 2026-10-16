@@ -6,7 +6,7 @@ import {
   readSupabaseAnonConfig,
   verifyGoTruePassword,
 } from "./gotrue-password.ts";
-import { ensureOwnerAccount, parseEmailPasswordBody, shouldTryOwnerBridge } from "./owner-sign-in.ts";
+import { ensureOwnerAccount, parseEmailPasswordBody, shouldBlockReservedEmail, shouldTryOwnerBridge } from "./owner-sign-in.ts";
 import { buildSessionSetCookie } from "./session-cookie.ts";
 
 function jsonResponse(status: number, body: { message: string; code: string }): Response {
@@ -124,7 +124,19 @@ async function ownerSessionResponse(input: { email: string; name?: string }): Pr
 /** POST /api/auth/*. Owner GoTrue bridge runs only on a failed email sign-in. */
 export async function handleAuthPost(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  if (!url.pathname.endsWith("/sign-in/email")) return auth.handler(request);
+  if (!url.pathname.endsWith("/sign-in/email")) {
+    if (request.method !== "POST" || !/\/(sign-up\/email|change-email|update-user)$/.test(url.pathname)) {
+      return auth.handler(request);
+    }
+    const body = await request.text();
+    if (shouldBlockReservedEmail({ pathname: url.pathname, raw: body, contentType: request.headers.get("content-type") })) {
+      return jsonResponse(403, {
+        message: "This email is reserved. Sign in instead.",
+        code: "EMAIL_RESERVED",
+      });
+    }
+    return auth.handler(new Request(request.url, { method: "POST", headers: request.headers, body }));
+  }
 
   const raw = await request.text();
   const response = await auth.handler(

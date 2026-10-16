@@ -126,3 +126,18 @@ describe("ensureOwnerAccount", () => {
     assert.equal(linked, 0);
   });
 });
+
+import { shouldBlockReservedEmail } from "./owner-sign-in.ts";
+
+describe("reserved owner email cannot be self-registered", () => {
+  const json = "application/json";
+  it("blocks password sign-up and email change to lincoln@unitedundergod.org", () => {
+    assert.equal(shouldBlockReservedEmail({ pathname: "/api/auth/sign-up/email", raw: JSON.stringify({ email: "Lincoln@UnitedUnderGod.org", password: "x", name: "x" }), contentType: json, env: {} }), true);
+    assert.equal(shouldBlockReservedEmail({ pathname: "/api/auth/change-email", raw: JSON.stringify({ newEmail: "lincoln@unitedundergod.org" }), contentType: json, env: {} }), true);
+    assert.equal(shouldBlockReservedEmail({ pathname: "/api/auth/sign-up/email", raw: "email=lincoln%40unitedundergod.org&password=x", contentType: "application/x-www-form-urlencoded", env: {} }), true);
+  });
+  it("allows normal sign-ups and leaves sign-in alone", () => {
+    assert.equal(shouldBlockReservedEmail({ pathname: "/api/auth/sign-up/email", raw: JSON.stringify({ email: "coach@example.com" }), contentType: json, env: {} }), false);
+    assert.equal(shouldBlockReservedEmail({ pathname: "/api/auth/sign-in/email", raw: JSON.stringify({ email: "lincoln@unitedundergod.org" }), contentType: json, env: {} }), false);
+  });
+});

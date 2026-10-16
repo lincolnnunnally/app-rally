@@ -67,8 +67,17 @@ export async function verifyGoTruePassword(
   }
 
   const body = (await response.json().catch(() => null)) as {
-    user?: { user_metadata?: { name?: unknown; full_name?: unknown } };
+    user?: {
+      email?: unknown;
+      email_confirmed_at?: unknown;
+      user_metadata?: { name?: unknown; full_name?: unknown };
+    };
   } | null;
+  // Only a confirmed LPL account for this exact address may be bridged.
+  const gotEmail = typeof body?.user?.email === "string" ? body.user.email.trim().toLowerCase() : "";
+  if (gotEmail !== email.trim().toLowerCase() || !body?.user?.email_confirmed_at) {
+    return { ok: false, reason: "rejected", message: "Invalid email or password" };
+  }
   const meta = body?.user?.user_metadata;
   const name =
     typeof meta?.name === "string"

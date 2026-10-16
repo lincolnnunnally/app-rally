@@ -56,7 +56,13 @@ describe("verifyGoTruePassword", () => {
           body: String(init.body),
         };
         return new Response(
-          JSON.stringify({ user: { user_metadata: { name: "Lincoln Nunnally" } } }),
+          JSON.stringify({
+            user: {
+              email: "lincoln@unitedundergod.org",
+              email_confirmed_at: "2026-06-11T00:00:00Z",
+              user_metadata: { name: "Lincoln Nunnally" },
+            },
+          }),
           { status: 200 },
         );
       },
@@ -84,9 +90,26 @@ describe("verifyGoTruePassword", () => {
   });
 });
 
+describe("verifyGoTruePassword confirmation", () => {
+  const config = { url: "https://db.example.co", anonKey: "anon-key" };
+  it("rejects an unconfirmed or mismatched LPL account", async () => {
+    for (const user of [
+      { email: "lincoln@unitedundergod.org" },
+      { email: "someone@else.com", email_confirmed_at: "2026-01-01T00:00:00Z" },
+      {},
+    ]) {
+      const result = await verifyGoTruePassword(config, "lincoln@unitedundergod.org", "x", async () =>
+        new Response(JSON.stringify({ user }), { status: 200 }),
+      );
+      assert.equal(result.ok, false);
+    }
+  });
+});
+
 describe("unavailable copy", () => {
   it("names the env vars the app reads", () => {
     assert.match(OWNER_SIGN_IN_UNAVAILABLE, /SUPABASE_URL/);
     assert.match(OWNER_SIGN_IN_UNAVAILABLE, /SUPABASE_ANON_KEY/);
   });
+
 });

@@ -63,6 +63,8 @@ async function main() {
     ssl: { rejectUnauthorized: false },
   });
   const client = await pool.connect();
+  // Surface RAISE NOTICE lines (e.g. cleanup read-backs) in the build log.
+  client.on("notice", (msg) => console.log(`[migrate] notice: ${msg.message}`));
   try {
     // Shared LPL: keep Rally isolated in its own schema (Better Auth tables
     // would otherwise collide with public.user-like names across ecosystem apps).

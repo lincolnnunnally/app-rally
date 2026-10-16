@@ -16,6 +16,7 @@ import type {
   ReviewRow,
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
+import { COACH_CARD_PCT, COACH_YEAR_CENTS, PAID_VIA, annualFeeDue, annualRenewsOn, lessonCardTakeCents, parsePaidVia } from "@/lib/coach-fee";
 import { canActorSaveLessonNotes, LESSON_NOTES_MAX, lessonNotesNotice } from "@/lib/lesson-notes";
 import {
   assertLessonVideoChoice,
@@ -583,7 +584,7 @@ async function recordTake(sql: Sql, kind: string, amount: number, sourceUserId: 
     values (${kind}, ${amount}, ${sourceUserId}, ${relatedId}, ${note})
   `;
 }
-async function settleTake(sql: Sql, opts: { kind: string; scheduled: number; payerUserId: string; relatedId: number; note: string }) {
+async function settleTake(sql: Sql, opts: { kind: string; scheduled: number; payerUserId: string; relatedId: number; note: string; skipReferral?: boolean }) {
 	if (opts.scheduled <= 0) return {
 		take: 0,
 		creditUsed: 0
@@ -600,7 +601,7 @@ async function settleTake(sql: Sql, opts: { kind: string; scheduled: number; pay
     `;
 	await recordTake(sql, opts.kind, take, opts.payerUserId, opts.relatedId, opts.note);
 	const referrer = row[0]?.referred_by == null ? null : String(row[0].referred_by);
-	if (referrer && referrer !== opts.payerUserId && take > 0) {
+	if (!opts.skipReferral && referrer && referrer !== opts.payerUserId && take > 0) {
 		const bonus = takeCents(take, RALLY.referralPct);
 		if (bonus > 0) {
 			await sql`
@@ -670,25 +671,101 @@ function mapProof(r: Record<string, unknown>, sessions?: number): PlayerProof {
 		photo_data: r.photo_data == null ? null : String(r.photo_data)
 	};
 }
-function billingOf(createdAt: unknown, stored: string, takeThisMonth: number): CoachBilling {
-	let start;
-	if (createdAt instanceof Date && !Number.isNaN(createdAt.getTime())) start = createdAt;
-	else start = new Date(String(createdAt ?? "").replace(" ", "T"));
-	const ends = new Date(start.getTime() + RALLY.trialDays * 864e5);
-	const inTrial = !Number.isNaN(start.getTime()) && Date.now() < ends.getTime();
-	const plan = stored === "monthly" ? "monthly" : "percent";
-	const y = ends.getFullYear();
-	const m = String(ends.getMonth() + 1).padStart(2, "0");
-	const d = String(ends.getDate()).padStart(2, "0");
+function billingOf(lastAnnual: unknown, takeThisMonth: number): CoachBilling {
+	let last: Date | null = null;
+	if (lastAnnual instanceof Date && !Number.isNaN(lastAnnual.getTime())) last = lastAnnual;
+	else if (lastAnnual != null && String(lastAnnual).trim() !== "") {
+		const d = new Date(String(lastAnnual).replace(" ", "T"));
+		last = Number.isNaN(d.getTime()) ? null : d;
+	}
 	return {
-		plan: inTrial ? "trial" : plan,
-		stored: plan,
-		trial_ends: `${y}-${m}-${d}`,
-		in_trial: inTrial,
+		plan: "annual",
+		year_cents: COACH_YEAR_CENTS,
+		card_pct: COACH_CARD_PCT,
+		annual_renews_on: annualRenewsOn(last),
 		take_this_month: takeThisMonth,
 		cash_app_handle: null,
 		venmo_handle: null
 	};
+}
+async function lastAnnualFeeAt(sql: Sql, coach: string) {
+	return (await sql`
+    select max(created_at) as at from coach_ledger
+    where coach_user_id = ${coach} and category = 'rally_annual'
+  `)[0]?.at ?? null;
+}
+/** $100/yr coach fee, recorded once per 365 days on the ledger. No money moves. */
+async function recordAnnualFeeIfDue(sql: Sql, coach: string, lessonId: number) {
+	const last = await lastAnnualFeeAt(sql, coach);
+	const lastDate = last instanceof Date ? last : last == null ? null : new Date(String(last).replace(" ", "T"));
+	if (!annualFeeDue(lastDate)) return;
+	const settled = await settleTake(sql, {
+		kind: "coach_annual",
+		payerUserId: coach,
+		scheduled: COACH_YEAR_CENTS,
+		relatedId: lessonId,
+		note: "Rally coach year"
+	});
+	if (settled.take + settled.creditUsed > 0) await sql`
+      insert into coach_ledger (coach_user_id, kind, category, amount_cents, note, lesson_id)
+      values (
+        ${coach}, 'expense', 'rally_annual', ${settled.take},
+        ${settled.creditUsed ? "Rally coach year · share credit applied" : "Rally coach year"},
+        ${lessonId}
+      )
+    `;
+}
+/**
+ * Make the lesson's Rally card take match its payment method: 5% on card (no cap), 0 otherwise.
+ * Idempotent; safe to call on completion and whenever the coach changes how it was paid.
+ * Facility take (court 8% / facility 10%) is untouched.
+ */
+async function syncLessonCardTake(sql: Sql, lessonId: number) {
+	const l = (await sql`
+    select coach_user_id, price_cents, paid_via, status, rally_take_cents from lessons where id = ${lessonId}
+  `)[0];
+	if (!l) return;
+	const coach = String(l.coach_user_id);
+	const price = num(l.price_cents ?? 0);
+	const want = String(l.status) === "completed" ? lessonCardTakeCents(price, parsePaidVia(l.paid_via)) : 0;
+	const existing = await sql`
+    select id, amount_cents from coach_ledger
+    where lesson_id = ${lessonId} and coach_user_id = ${coach} and category = 'rally_take'
+  `;
+	const had = existing.length > 0;
+	let lessonTake = existing.reduce((a, r) => a + num(r.amount_cents ?? 0), 0);
+	if (had && want === 0) {
+		// Drop the card take; give back any share credit that covered it.
+		const prior = lessonCardTakeCents(price, "card");
+		const refund = Math.max(0, prior - lessonTake);
+		await sql`delete from coach_ledger where lesson_id = ${lessonId} and coach_user_id = ${coach} and category = 'rally_take'`;
+		await sql`delete from platform_ledger where kind = 'lesson' and related_id = ${lessonId} and source_user_id = ${coach}`;
+		if (refund > 0) await sql`update profiles set credit_cents = credit_cents + ${refund} where user_id = ${coach}`;
+		lessonTake = 0;
+	} else if (!had && want > 0) {
+		const priorBonus = num((await sql`
+      select count(*)::int as n from referral_events where kind = 'lesson' and related_id = ${lessonId}
+    `)[0]?.n ?? 0);
+		const note = `Rally ${COACH_CARD_PCT}% of card lesson`;
+		const settled = await settleTake(sql, {
+			kind: "lesson",
+			payerUserId: coach,
+			scheduled: want,
+			relatedId: lessonId,
+			note,
+			skipReferral: priorBonus > 0
+		});
+		if (settled.take + settled.creditUsed > 0) await sql`
+        insert into coach_ledger (coach_user_id, kind, category, amount_cents, note, lesson_id)
+        values (${coach}, 'expense', 'rally_take', ${settled.take}, ${settled.creditUsed ? `${note} · share credit` : note}, ${lessonId})
+      `;
+		lessonTake = settled.take;
+	} else if (!had) lessonTake = 0;
+	const facilityTake = num((await sql`
+    select coalesce(sum(amount_cents),0)::int as n from platform_ledger
+    where kind = 'facility' and related_id = ${lessonId} and source_user_id = ${coach}
+  `)[0]?.n ?? 0);
+	await sql`update lessons set rally_take_cents = ${lessonTake + facilityTake} where id = ${lessonId}`;
 }
 async function notify(sql: Sql, userId: string, title: string, body: string, href: string | null) {
 	if (userId.startsWith("seed:")) return;
@@ -1423,11 +1500,11 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
 	const takeMonth = await sql`
       select coalesce(sum(amount_cents),0)::int as n from coach_ledger
       where coach_user_id = ${context.userId}
-        and category in ('rally_take', 'rally_monthly')
+        and category in ('rally_take', 'rally_monthly', 'rally_annual')
         and occurred_on >= date_trunc('month', current_date)
     `;
 	const billing = {
-		...billingOf(coach[0]?.created_at, String(coach[0]?.billing_plan ?? "percent"), num(takeMonth[0]?.n ?? 0)),
+		...billingOf(await lastAnnualFeeAt(sql, context.userId), num(takeMonth[0]?.n ?? 0)),
 		cash_app_handle: coach[0]?.cash_app_handle == null || String(coach[0].cash_app_handle).trim() === ""
 			? null
 			: String(coach[0].cash_app_handle),
@@ -1536,11 +1613,17 @@ export const saveCoachProfile = createServerFn({ method: "POST" }).middleware([a
     `;
 	return { ok: true };
 });
-export const saveCoachBilling = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({ plan: z.enum(["percent", "monthly"]) })).handler(async ({ context, data }) => {
-	await (await getSql())`
-      update coach_profiles set billing_plan = ${data.plan}
-      where user_id = ${context.userId}
-    `;
+/** How the player paid a lesson. Card carries Rally's 5%; Cash App / Venmo / cash carry 0%. */
+export const setLessonPaidVia = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
+	id: z.coerce.number(),
+	paid_via: z.enum(PAID_VIA).nullable()
+})).handler(async ({ context, data }) => {
+	const sql = await getSql();
+	const row = (await sql`select coach_user_id from lessons where id = ${data.id}`)[0];
+	if (!row) throw new Error("Lesson not found");
+	if (String(row.coach_user_id) !== context.userId) throw new Error("Only the coach can mark how a lesson was paid.");
+	await sql`update lessons set paid_via = ${data.paid_via} where id = ${data.id}`;
+	await syncLessonCardTake(sql, data.id);
 	return { ok: true };
 });
 export const saveCoachPayHandles = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator(z.object({
@@ -1566,7 +1649,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
 	const lessons = (who.coach ? await sql`
         select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
                l.duration_min, l.sport, l.status, l.notes, l.private_notes, l.price_cents, l.billing, l.group_spots,
-               l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
+               l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents, l.paid_via,
                l.for_kind, l.for_name,
                (
                  (l.video_path is not null and length(l.video_path) > 0)
@@ -1585,7 +1668,7 @@ async function loadLessons(sql: Sql, who: { coach?: string; player?: string }): 
       ` : await sql`
         select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
                l.duration_min, l.sport, l.status, l.notes, l.price_cents, l.billing, l.group_spots,
-               l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
+               l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents, l.paid_via,
                l.for_kind, l.for_name,
                (
                  (l.video_path is not null and length(l.video_path) > 0)
@@ -1648,6 +1731,7 @@ function mapLesson(r: Record<string, unknown>): LessonRow {
 		facility_cut_cents: num(r.facility_cut_cents ?? 0),
 		service_name: r.service_name == null ? null : String(r.service_name),
 		rally_take_cents: num(r.rally_take_cents ?? 0),
+		paid_via: parsePaidVia(r.paid_via),
 		for_kind: r.for_kind === "child" ? "child" : "self",
 		for_name: r.for_name == null ? null : String(r.for_name)
 	};
@@ -1664,7 +1748,7 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
 	const row = (await sql`
       select l.id, l.coach_user_id, l.player_user_id, l.court_id, l.starts_at::text as starts_at,
              l.duration_min, l.sport, l.status, l.notes, l.private_notes, l.price_cents, l.billing, l.group_spots,
-             l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents,
+             l.series_id, l.facility_fee_cents, l.facility_cut_cents, l.rally_take_cents, l.paid_via,
              l.for_kind, l.for_name,
              (
                (l.video_path is not null and length(l.video_path) > 0)
@@ -2164,53 +2248,8 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
         `;
 		const facilityTake = takeCents(fee, RALLY.facilityPct) + takeCents(cut, RALLY.facilityPct);
 		if (facilityTake > 0) await recordTake(sql, "facility", facilityTake, coach, data.id, "Rally share of facility fee/cut");
-		const planRow = await sql`
-        select billing_plan, created_at from coach_profiles where user_id = ${coach} limit 1
-      `;
-		const billing = billingOf(planRow[0]?.created_at, String(planRow[0]?.billing_plan ?? "percent"), 0);
-		let lessonTake = 0;
-		if (billing.plan === "percent" && price > 0) lessonTake = takeCents(price, RALLY.lessonPct);
-		else if (billing.plan === "monthly") {
-			if (num((await sql`
-          select count(*)::int as n from coach_ledger
-          where coach_user_id = ${coach} and category = 'rally_monthly'
-            and occurred_on >= date_trunc('month', current_date)
-        `)[0]?.n ?? 0) === 0) {
-				const settled = await settleTake(sql, {
-					kind: "coach_monthly",
-					payerUserId: coach,
-					scheduled: RALLY.monthlyCents,
-					relatedId: data.id,
-					note: "Monthly after trial"
-				});
-				if (settled.take + settled.creditUsed > 0) await sql`
-              insert into coach_ledger (coach_user_id, kind, category, amount_cents, note, lesson_id)
-              values (
-                ${coach}, 'expense', 'rally_monthly', ${settled.take},
-                ${settled.creditUsed ? "Rally monthly · share credit applied" : "Rally monthly after trial"},
-                ${data.id}
-              )
-            `;
-			}
-		}
-		if (lessonTake > 0) {
-			const settled = await settleTake(sql, {
-				kind: "lesson",
-				payerUserId: coach,
-				scheduled: lessonTake,
-				relatedId: data.id,
-				note: `Rally ${RALLY.lessonPct}% of lesson`
-			});
-			if (settled.take + settled.creditUsed > 0) {
-				const takeNote = settled.creditUsed ? `Rally ${RALLY.lessonPct}% of lesson · share credit` : `Rally ${RALLY.lessonPct}% of lesson`;
-				await sql`
-            insert into coach_ledger (coach_user_id, kind, category, amount_cents, note, lesson_id)
-            values (${coach}, 'expense', 'rally_take', ${settled.take}, ${takeNote}, ${data.id})
-          `;
-			}
-			lessonTake = settled.take;
-		}
-		await sql`update lessons set rally_take_cents = ${(billing.plan === "monthly" ? 0 : lessonTake) + facilityTake} where id = ${data.id}`;
+		await recordAnnualFeeIfDue(sql, coach, data.id);
+		await syncLessonCardTake(sql, data.id);
 		const other = context.userId === coach ? player : coach;
 		await notify(
 			sql,

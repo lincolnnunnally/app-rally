@@ -1,3 +1,4 @@
+import { useRally } from "@/lib/rally-context";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -49,6 +50,7 @@ function isActive(pathname: string, to: string) {
 }
 
 export function AppShell() {
+  const { isOwner } = useRally();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
@@ -74,6 +76,11 @@ export function AppShell() {
         </nav>
         <div className="flex items-center gap-2">
           <NoticeBell />
+          {isOwner ? (
+            <Link to="/app/admin" className="hidden px-2 text-sm text-muted-foreground hover:text-foreground md:inline">
+              Owner
+            </Link>
+          ) : null}
           <div className="hidden md:block">
             <UserButton />
           </div>
@@ -190,6 +197,7 @@ function NoticeBell() {
 
 /** Phones hide the header account controls, so Sign out lives behind this menu. */
 function AccountMenu() {
+  const { isOwner } = useRally();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -216,6 +224,11 @@ function AccountMenu() {
             <Link to="/app/you" className="py-2 text-muted-foreground hover:text-foreground">
               Everything else
             </Link>
+            {isOwner ? (
+              <Link to="/app/admin" className="py-2 text-muted-foreground hover:text-foreground">
+                Free access (owner)
+              </Link>
+            ) : null}
           </div>
         </div>
       ) : null}

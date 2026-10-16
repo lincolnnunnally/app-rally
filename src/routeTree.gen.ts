@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as CoachesRouteImport } from './routes/coaches'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as ListACourtRouteImport } from './routes/list-a-court'
 import { Route as LoginRouteImport } from './routes/login'
@@ -21,6 +22,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WhereRouteImport } from './routes/where'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppAdminRouteImport } from './routes/app/admin'
 import { Route as AppCoachesRouteImport } from './routes/app/coaches'
 import { Route as AppCourtsRouteImport } from './routes/app/courts'
 import { Route as AppDeskRouteImport } from './routes/app/desk'
@@ -31,7 +33,9 @@ import { Route as AppPlayRouteImport } from './routes/app/play'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
 import { Route as AppProgressRouteImport } from './routes/app/progress'
 import { Route as AppYouRouteImport } from './routes/app/you'
+import { Route as BookCodeRouteImport } from './routes/book.$code'
 import { Route as ClaimCodeRouteImport } from './routes/claim.$code'
+import { Route as CoachCodeRouteImport } from './routes/coach.$code'
 import { Route as WhereIndexRouteImport } from './routes/where.index'
 import { Route as WhereCityRouteImport } from './routes/where.$city'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -49,6 +53,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoachesRoute = CoachesRouteImport.update({
+  id: '/coaches',
+  path: '/coaches',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JoinRoute = JoinRouteImport.update({
@@ -101,6 +110,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppCoachesRoute = AppCoachesRouteImport.update({
   id: '/coaches',
   path: '/coaches',
@@ -151,9 +165,19 @@ const AppYouRoute = AppYouRouteImport.update({
   path: '/you',
   getParentRoute: () => AppRoute,
 } as any)
+const BookCodeRoute = BookCodeRouteImport.update({
+  id: '/book/$code',
+  path: '/book/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClaimCodeRoute = ClaimCodeRouteImport.update({
   id: '/claim/$code',
   path: '/claim/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoachCodeRoute = CoachCodeRouteImport.update({
+  id: '/coach/$code',
+  path: '/coach/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WhereIndexRoute = WhereIndexRouteImport.update({
@@ -200,6 +224,7 @@ const WhereCitySlugRoute = WhereCitySlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/coaches': typeof CoachesRoute
   '/join': typeof JoinRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
@@ -209,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/where': typeof WhereRouteWithChildren
+  '/app/admin': typeof AppAdminRoute
   '/app/coaches': typeof AppCoachesRoute
   '/app/courts': typeof AppCourtsRoute
   '/app/desk': typeof AppDeskRoute
@@ -219,7 +245,9 @@ export interface FileRoutesByFullPath {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/book/$code': typeof BookCodeRoute
   '/claim/$code': typeof ClaimCodeRoute
+  '/coach/$code': typeof CoachCodeRoute
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
@@ -232,6 +260,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/coaches': typeof CoachesRoute
   '/join': typeof JoinRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
@@ -240,6 +269,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/app/admin': typeof AppAdminRoute
   '/app/coaches': typeof AppCoachesRoute
   '/app/courts': typeof AppCourtsRoute
   '/app/desk': typeof AppDeskRoute
@@ -249,7 +279,9 @@ export interface FileRoutesByTo {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/book/$code': typeof BookCodeRoute
   '/claim/$code': typeof ClaimCodeRoute
+  '/coach/$code': typeof CoachCodeRoute
   '/app': typeof AppIndexRoute
   '/where': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -263,6 +295,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/coaches': typeof CoachesRoute
   '/join': typeof JoinRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
@@ -272,6 +305,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/where': typeof WhereRouteWithChildren
+  '/app/admin': typeof AppAdminRoute
   '/app/coaches': typeof AppCoachesRoute
   '/app/courts': typeof AppCourtsRoute
   '/app/desk': typeof AppDeskRoute
@@ -282,7 +316,9 @@ export interface FileRoutesById {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/book/$code': typeof BookCodeRoute
   '/claim/$code': typeof ClaimCodeRoute
+  '/coach/$code': typeof CoachCodeRoute
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
   '/where/': typeof WhereIndexRoute
@@ -298,6 +334,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/coaches'
     | '/join'
     | '/list-a-court'
     | '/login'
@@ -307,6 +344,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/where'
+    | '/app/admin'
     | '/app/coaches'
     | '/app/courts'
     | '/app/desk'
@@ -317,7 +355,9 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/book/$code'
     | '/claim/$code'
+    | '/coach/$code'
     | '/where/$city'
     | '/app/'
     | '/where/'
@@ -330,6 +370,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/coaches'
     | '/join'
     | '/list-a-court'
     | '/login'
@@ -338,6 +379,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/terms'
+    | '/app/admin'
     | '/app/coaches'
     | '/app/courts'
     | '/app/desk'
@@ -347,7 +389,9 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/book/$code'
     | '/claim/$code'
+    | '/coach/$code'
     | '/app'
     | '/where'
     | '/api/auth/$'
@@ -360,6 +404,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/coaches'
     | '/join'
     | '/list-a-court'
     | '/login'
@@ -369,6 +414,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/where'
+    | '/app/admin'
     | '/app/coaches'
     | '/app/courts'
     | '/app/desk'
@@ -379,7 +425,9 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/book/$code'
     | '/claim/$code'
+    | '/coach/$code'
     | '/where/$city'
     | '/app/'
     | '/where/'
@@ -394,6 +442,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  CoachesRoute: typeof CoachesRoute
   JoinRoute: typeof JoinRoute
   ListACourtRoute: typeof ListACourtRoute
   LoginRoute: typeof LoginRoute
@@ -403,7 +452,9 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   WhereRoute: typeof WhereRouteWithChildren
+  BookCodeRoute: typeof BookCodeRoute
   ClaimCodeRoute: typeof ClaimCodeRoute
+  CoachCodeRoute: typeof CoachCodeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -421,6 +472,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coaches': {
+      id: '/coaches'
+      path: '/coaches'
+      fullPath: '/coaches'
+      preLoaderRoute: typeof CoachesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/join': {
@@ -493,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/admin': {
+      id: '/app/admin'
+      path: '/admin'
+      fullPath: '/app/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/coaches': {
       id: '/app/coaches'
       path: '/coaches'
@@ -563,11 +628,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppYouRouteImport
       parentRoute: typeof AppRoute
     }
+    '/book/$code': {
+      id: '/book/$code'
+      path: '/book/$code'
+      fullPath: '/book/$code'
+      preLoaderRoute: typeof BookCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/claim/$code': {
       id: '/claim/$code'
       path: '/claim/$code'
       fullPath: '/claim/$code'
       preLoaderRoute: typeof ClaimCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coach/$code': {
+      id: '/coach/$code'
+      path: '/coach/$code'
+      fullPath: '/coach/$code'
+      preLoaderRoute: typeof CoachCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/where/': {
@@ -644,6 +723,7 @@ const AppLeaguesRouteWithChildren = AppLeaguesRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAdminRoute: typeof AppAdminRoute
   AppCoachesRoute: typeof AppCoachesRoute
   AppCourtsRoute: typeof AppCourtsRoute
   AppDeskRoute: typeof AppDeskRoute
@@ -659,6 +739,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAdminRoute: AppAdminRoute,
   AppCoachesRoute: AppCoachesRoute,
   AppCourtsRoute: AppCourtsRoute,
   AppDeskRoute: AppDeskRoute,
@@ -704,6 +785,7 @@ const WhereRouteWithChildren = WhereRoute._addFileChildren(WhereRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  CoachesRoute: CoachesRoute,
   JoinRoute: JoinRoute,
   ListACourtRoute: ListACourtRoute,
   LoginRoute: LoginRoute,
@@ -713,9 +795,20 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   WhereRoute: WhereRouteWithChildren,
+  BookCodeRoute: BookCodeRoute,
   ClaimCodeRoute: ClaimCodeRoute,
+  CoachCodeRoute: CoachCodeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

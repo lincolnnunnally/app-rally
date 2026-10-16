@@ -30,6 +30,7 @@ import {
   BOOKING_MODES,
   COURT_KINDS,
   RALLY,
+  SHOW_FACILITY_LEAGUE_PCT,
   bookingLabel,
   citySlug,
   feeSplit,
@@ -158,13 +159,13 @@ function Courts() {
                   {(c.player_fee_cents > 0 || c.coach_fee_cents > 0 || c.facility_cut_pct > 0) && (
                     <p className="mt-1 text-sm text-muted-foreground">
                       {c.player_fee_cents > 0
-                        ? `Player ${money(c.player_fee_cents)}${feeSplit(c.player_fee_cents, RALLY.courtPct).take ? ` · Rally ${money(feeSplit(c.player_fee_cents, RALLY.courtPct).take)}` : ""} · `
+                        ? `Player ${money(c.player_fee_cents)}${SHOW_FACILITY_LEAGUE_PCT && feeSplit(c.player_fee_cents, RALLY.courtPct).take ? ` · Rally ${money(feeSplit(c.player_fee_cents, RALLY.courtPct).take)}` : ""} · `
                         : ""}
                       {c.coach_fee_cents > 0
-                        ? `Coach court fee ${money(c.coach_fee_cents)}${feeSplit(c.coach_fee_cents, RALLY.courtPct).take ? ` · Rally ${money(feeSplit(c.coach_fee_cents, RALLY.courtPct).take)}` : ""} · `
+                        ? `Coach court fee ${money(c.coach_fee_cents)}${SHOW_FACILITY_LEAGUE_PCT && feeSplit(c.coach_fee_cents, RALLY.courtPct).take ? ` · Rally ${money(feeSplit(c.coach_fee_cents, RALLY.courtPct).take)}` : ""} · `
                         : ""}
                       {c.facility_cut_pct > 0
-                        ? `Facility takes ${c.facility_cut_pct}% of a lesson · Rally ${RALLY.facilityPct}% of that cut`
+                        ? `Facility takes ${c.facility_cut_pct}% of a lesson${SHOW_FACILITY_LEAGUE_PCT ? ` · Rally ${RALLY.facilityPct}% of that cut` : ""}`
                         : ""}
                     </p>
                   )}
@@ -223,7 +224,7 @@ function Courts() {
                           {formatWall(r.starts_at)} · {sportLabel(r.sport)}
                           {r.status === "pending" ? " · pending call" : ""}
                           {r.fee_cents > 0 ? ` · ${money(r.fee_cents)}` : ""}
-                          {r.rally_take_cents > 0 ? ` · Rally ${money(r.rally_take_cents)}` : ""}
+                          {SHOW_FACILITY_LEAGUE_PCT && r.rally_take_cents > 0 ? ` · Rally ${money(r.rally_take_cents)}` : ""}
                           <span className="text-muted-foreground"> · {r.mine ? "You" : r.holder_name}</span>
                         </span>
                         {r.mine ? (
@@ -338,8 +339,8 @@ function ReserveDialog({ court, courts }: { court: Court; courts: Court[] }) {
           {fee > 0 ? (
             <p className="text-sm">
               Due at the facility: <span className="font-medium">{money(fee)}</span>
-              {split.take > 0 ? ` · Rally ${money(split.take)} (${RALLY.courtPct}%) · facility keeps ${money(split.net)}` : ""}
-              {court.facility_cut_pct > 0 ? ` · they also take ${court.facility_cut_pct}% of a lesson (Rally ${RALLY.facilityPct}% of that cut)` : ""}
+              {SHOW_FACILITY_LEAGUE_PCT && split.take > 0 ? ` · Rally ${money(split.take)} (${RALLY.courtPct}%) · facility keeps ${money(split.net)}` : ""}
+              {court.facility_cut_pct > 0 ? ` · they also take ${court.facility_cut_pct}% of a lesson${SHOW_FACILITY_LEAGUE_PCT ? ` (Rally ${RALLY.facilityPct}% of that cut)` : ""}` : ""}
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">No player fee on this court. Rally takes nothing when the fee is $0.</p>

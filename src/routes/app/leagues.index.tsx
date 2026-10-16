@@ -2,7 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { LEAGUE_FORMATS, RALLY, feeSplit, formatLabel, money, sportLabel } from "@/lib/rally";
+import { LEAGUE_FORMATS, RALLY, SHOW_FACILITY_LEAGUE_PCT, feeSplit, formatLabel, money, sportLabel } from "@/lib/rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -64,7 +64,7 @@ function Leagues() {
                 {l.skill_band ? ` · ${l.skill_band}` : ""}
                 {l.season_label ? ` · ${l.season_label}` : ""}
                 {` · ${l.member_count} on roster`}
-                {l.reg_fee_cents > 0 ? ` · ${money(l.reg_fee_cents)} to join · Rally ${money(feeSplit(l.reg_fee_cents, RALLY.leaguePct).take)}` : ""}
+                {l.reg_fee_cents > 0 ? ` · ${money(l.reg_fee_cents)} to join${SHOW_FACILITY_LEAGUE_PCT ? ` · Rally ${money(feeSplit(l.reg_fee_cents, RALLY.leaguePct).take)}` : ""}` : ""}
               </p>
               {l.notes ? <p className="mt-2 text-sm leading-relaxed">{l.notes}</p> : null}
             </div>
@@ -164,7 +164,9 @@ function CreateLeague() {
             <Label>Registration fee $ (optional)</Label>
             <Input name="reg_fee" type="number" min={0} defaultValue={0} />
             <p className="text-xs text-muted-foreground">
-              Rally takes {RALLY.leaguePct}% of a registration fee. $0 means Rally takes nothing.
+              {SHOW_FACILITY_LEAGUE_PCT
+                ? `Rally takes ${RALLY.leaguePct}% of a registration fee. $0 means Rally takes nothing.`
+                : "$0 means Rally takes nothing."}
             </p>
           </div>
           <div className="flex flex-col gap-1.5">

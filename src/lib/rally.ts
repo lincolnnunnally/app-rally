@@ -1,3 +1,4 @@
+import { COACH_CARD_PCT, COACH_YEAR_CENTS, type PaidVia } from "./coach-fee.ts";
 export const SPORTS = ["pickleball", "tennis"] as const;
 export type Sport = (typeof SPORTS)[number];
 
@@ -46,15 +47,18 @@ export const SERVICE_UNITS = [
 export const RALLY = {
   courtPct: 8,
   leaguePct: 10,
-  lessonPct: 8,
   facilityPct: 10,
-  trialDays: 30,
-  monthlyCents: 1500,
   referralPct: 25,
-  /** Decided coach pricing (display copy). Charging logic still uses lessonPct/monthlyCents. */
-  coachYearCents: 10000,
-  coachCardPct: 5,
+  /** Decided coach pricing: $100/yr + 5% on card lessons only (see coach-fee.ts). */
+  coachYearCents: COACH_YEAR_CENTS,
+  coachCardPct: COACH_CARD_PCT,
 } as const;
+
+/**
+ * Facility court 8% / league 10% / facility-cut 10% are still computed on the ledger, but not
+ * confirmed for public display. Keep false until they are confirmed.
+ */
+export const SHOW_FACILITY_LEAGUE_PCT = false;
 
 export const REF_KEY = "rally_ref";
 export const COACH_KEY = "rally_coach";
@@ -502,6 +506,7 @@ export type LessonRow = {
   facility_cut_cents: number;
   service_name: string | null;
   rally_take_cents: number;
+  paid_via: PaidVia | null;
   for_kind: "self" | "child";
   for_name: string | null;
   private_notes: string | null;
@@ -609,10 +614,11 @@ export type Advice = {
 };
 
 export type CoachBilling = {
-  plan: "trial" | "percent" | "monthly";
-  stored: "percent" | "monthly";
-  trial_ends: string;
-  in_trial: boolean;
+  plan: "annual";
+  year_cents: number;
+  card_pct: number;
+  /** Next annual fee date, or null before the first one is recorded. */
+  annual_renews_on: string | null;
   take_this_month: number;
   cash_app_handle: string | null;
   venmo_handle: string | null;

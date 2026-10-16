@@ -29,6 +29,7 @@ import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor } from "@/components/proof-lists";
 import { CheckInQr } from "@/components/checkin-qr";
 import { CoachPricing } from "@/components/coach-pricing";
+import { PaidViaPicker } from "@/components/paid-via";
 import { CoachInvite, PayHandleShow, PayHandles, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
@@ -390,7 +391,8 @@ function Desk() {
               <p className="text-xs tracking-widest text-muted-foreground uppercase">Pay prompt</p>
               <h2 className="mt-2 font-display text-2xl">Lesson complete — pull up the handles</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Same Cash App and Venmo QR as Books. No card checkout.
+                Same Cash App and Venmo QR as Books. No card checkout. Cash App and Venmo carry no
+                Rally fee.
               </p>
               <PayHandleShow
                 cashApp={desk.data?.billing.cash_app_handle ?? null}
@@ -398,6 +400,15 @@ function Desk() {
                 amount={payFor.price_cents != null ? payFor.price_cents / 100 : ""}
                 note="Rally lesson"
               />
+              {payFor.price_cents ? (
+                <div className="mt-4 border-t border-border pt-3">
+                  <PaidViaPicker
+                    lessonId={payFor.id}
+                    priceCents={payFor.price_cents}
+                    paidVia={(desk.data?.lessons ?? []).find((x) => x.id === payFor.id)?.paid_via ?? null}
+                  />
+                </div>
+              ) : null}
             </Card>
           ) : null}
 
@@ -437,7 +448,14 @@ function Desk() {
                     <p>
                       {lessonWho(l)} · {formatWall(l.starts_at)}
                       {l.service_name ? ` · ${l.service_name}` : ""}
+                      {l.price_cents ? ` · ${money(l.price_cents)}` : ""}
+                      {l.rally_take_cents > 0 ? ` · Rally ${money(l.rally_take_cents)}` : ""}
                     </p>
+                    {l.price_cents ? (
+                      <div className="mt-3">
+                        <PaidViaPicker lessonId={l.id} priceCents={l.price_cents} paidVia={l.paid_via} />
+                      </div>
+                    ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" variant="secondary" asChild>
                         <Link to="/app/lessons/$id" params={{ id: String(l.id) }}>

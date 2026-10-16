@@ -68,7 +68,7 @@ function Join() {
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
           {asCoach && who
-            ? `Create your player profile and you land on ${who.display_name}'s coaching list. You can also find people at your skill to hit with at Ed Smith Complex.`
+            ? `Create your player profile and you land on ${who.display_name}'s coaching list. You can also find people at your level to play with.`
             : "Rally runs tennis and pickleball: find a court, reserve a window, get matched with people at your skill level, book a coach, join a league."}
         </p>
         {who ? (

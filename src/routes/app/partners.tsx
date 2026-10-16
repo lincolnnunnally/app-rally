@@ -170,7 +170,7 @@ function Partners() {
           <p className="text-sm text-muted-foreground">
             {near
               ? "Nobody near your skill yet. Try everyone, or ask someone at Rec to put tennis and pickleball on their card."
-              : "You are first on the board. Ask someone at Rec to join Rally."}
+              : "You are the first one here. Invite someone you play with to join Rally."}
           </p>
         ) : null}
       </div>

@@ -3035,6 +3035,56 @@ export const listReviews = createServerFn({ method: "GET" })
 		}));
 	});
 
+/**
+ * Who may review: only someone who actually played with the subject.
+ * Coach: a completed lesson with that coach (for you or a kid you are guardian of).
+ * Player: a shared match or an accepted hit request. Facility: a reservation there.
+ */
+async function reviewGate(sql: Sql, userId: string, type: "player" | "coach" | "facility", subjectId: string) {
+	if (subjectId === userId) return { ok: false, reason: "You cannot review yourself." };
+	if (type === "coach") {
+		const n = num((await sql`
+      select count(*)::int as n from lessons l
+      where l.coach_user_id = ${subjectId} and l.status = 'completed'
+        and (l.player_user_id = ${userId}
+          or l.player_user_id in (select user_id from profiles where guardian_user_id = ${userId})
+          or l.player_user_id in (select student_id from student_guardian_links where user_id = ${userId}))
+    `)[0]?.n ?? 0);
+		return n > 0 ? { ok: true, reason: "" } : { ok: false, reason: "Reviews open after you finish a lesson with this coach." };
+	}
+	if (type === "player") {
+		const n = num((await sql`
+      select (
+        (select count(*) from match_sides a join match_sides b on a.match_id = b.match_id
+          where a.user_id = ${userId} and b.user_id = ${subjectId})
+        + (select count(*) from play_requests
+          where status = 'accepted'
+            and ((from_user_id = ${userId} and to_user_id = ${subjectId})
+              or (from_user_id = ${subjectId} and to_user_id = ${userId})))
+      )::int as n
+    `)[0]?.n ?? 0);
+		return n > 0 ? { ok: true, reason: "" } : { ok: false, reason: "Reviews open after you have played with this person on Rally." };
+	}
+	const courtId = Number(subjectId);
+	if (!Number.isFinite(courtId)) return { ok: false, reason: "Unknown facility." };
+	const n = num((await sql`
+    select count(*)::int as n from reservations
+    where user_id = ${userId} and court_id = ${courtId} and status <> 'cancelled' and starts_at <= now()
+  `)[0]?.n ?? 0);
+	return n > 0 ? { ok: true, reason: "" } : { ok: false, reason: "Reviews open after you have played here with a Rally reservation." };
+}
+
+export const reviewEligibility = createServerFn({ method: "GET" })
+	.middleware([authMiddleware])
+	.validator(z.object({
+		subject_type: z.enum(["player", "coach", "facility"]),
+		subject_id: z.string().min(1).max(80),
+	}))
+	.handler(async ({ context, data }) => {
+		const sql = await getSql();
+		return reviewGate(sql, context.userId, data.subject_type, data.subject_id);
+	});
+
 export const submitReview = createServerFn({ method: "POST" })
 	.middleware([authMiddleware])
 	.validator(z.object({
@@ -3048,6 +3098,8 @@ export const submitReview = createServerFn({ method: "POST" })
 			throw new Error("You cannot review yourself.");
 		}
 		const sql = await getSql();
+		const gate = await reviewGate(sql, context.userId, data.subject_type, data.subject_id);
+		if (!gate.ok) throw new Error(gate.reason);
 		await sql`
       insert into reviews (reviewer_user_id, subject_type, subject_id, rating, body)
       values (${context.userId}, ${data.subject_type}, ${data.subject_id}, ${data.rating}, ${data.body})

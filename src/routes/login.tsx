@@ -159,7 +159,9 @@ function Login() {
         </Link>
         <h1 className="font-display text-3xl">{mode === "in" ? "Sign in" : "Create an account"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Same account for players and coaches. Tennis and pickleball, each on their own card.
+          {mode === "in"
+            ? "Welcome back. Use the email and password you joined with."
+            : "One free account for players, parents, and coaches."}
         </p>
 
         {authEnabled && socialAuthEnabled ? (
@@ -195,6 +197,7 @@ function Login() {
                 id="email"
                 type="email"
                 autoComplete="email"
+                placeholder="e.g. you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -222,7 +225,13 @@ function Login() {
             {mode === "up" ? (
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input
+                  id="name"
+                  autoComplete="name"
+                  placeholder="e.g. Jordan Smith"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
             ) : null}
             <div className="flex flex-col gap-1.5">
@@ -231,6 +240,7 @@ function Login() {
                 id="email"
                 type="email"
                 autoComplete="email"
+                placeholder="e.g. you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -264,7 +274,7 @@ function Login() {
               />
             </div>
             <Button type="submit" disabled={busy}>
-              {busy ? "Working…" : mode === "in" ? "Sign in with email" : "Create account"}
+              {busy ? (mode === "in" ? "Signing in…" : "Creating…") : mode === "in" ? "Sign in" : "Create account"}
             </Button>
             {error ? (
               <p role="alert" className="text-sm text-destructive">
@@ -277,7 +287,7 @@ function Login() {
         {!forgot ? (
           <button
             type="button"
-            className="mt-6 text-sm text-muted-foreground hover:text-foreground"
+            className="mt-6 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             onClick={() => setMode(mode === "in" ? "up" : "in")}
           >
             {mode === "in" ? "Need an account? Create one" : "Already have an account? Sign in"}

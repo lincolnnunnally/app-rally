@@ -82,13 +82,13 @@ function Coaches() {
           </Button>
         ) : (
           <Button asChild variant="outline">
-            <Link to="/app/desk">I coach</Link>
+            <Link to="/app/desk">I coach — set up a page</Link>
           </Button>
         )}
       </div>
       <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-        Book a lesson for you or your kid. Pick Ed Smith Complex (Smith Park / Vidalia Rec) as the
-        court. The coach confirms. Recurring weeks stay on both calendars.
+        Book a lesson for you or your kid. Most lessons are at Ed Smith Complex, the public courts at
+        Smith Park in Vidalia. The coach confirms, and repeat weeks show on both calendars.
       </p>
 
       {(lessons.data ?? []).length > 0 ? (
@@ -165,7 +165,7 @@ function Coaches() {
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
               {fit === "all"
-                ? "Empty stays empty until a real coach opens a desk. If you teach, open yours."
+                ? "No coaches listed yet. If you teach, set up your coach page."
                 : "Try everyone, or open a desk if you teach this."}
             </p>
           </Card>
@@ -291,6 +291,12 @@ function BookDialog({
     if (autoOpen) setOpen(true);
   }, [autoOpen]);
   const [playerId, setPlayerId] = useState("me");
+  const [serviceId, setServiceId] = useState<string>(
+    coach.services[0] ? String(coach.services[0].id) : "",
+  );
+  const service = coach.services.find((s) => String(s.id) === serviceId);
+  const [minutes, setMinutes] = useState<number>(coach.services[0]?.duration_min || 60);
+  const fid = `book-${coach.user_id}`;
   const tennisCourt = courts.find(
     (c) => c.status === "open" && !c.is_other && c.sports.includes("tennis"),
   );
@@ -309,7 +315,7 @@ function BookDialog({
       }
     },
     onSuccess: () => {
-      toast.success("Request sent. The coach will confirm — you will see it on the board.");
+      toast.success("Request sent. You will get a notice when the coach confirms.");
       setOpen(false);
       void qc.invalidateQueries({ queryKey: ["my-lessons"] });
       void qc.invalidateQueries({ queryKey: ["notices"] });
@@ -323,7 +329,7 @@ function BookDialog({
         <Button>Request a lesson</Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogTitle>Request {coach.display_name}</DialogTitle>
+        <DialogTitle className="pr-8">Request a lesson with {coach.display_name}</DialogTitle>
         <DialogDescription>
           Pick the coach&apos;s time. They confirm or decline, and you get a notice either way.
         </DialogDescription>
@@ -359,8 +365,17 @@ function BookDialog({
         >
           {coach.services.length > 0 ? (
             <div className="flex flex-col gap-1.5">
-              <Label>Service</Label>
-              <Select name="service_id" defaultValue={String(coach.services[0]!.id)}>
+              <Label htmlFor={`${fid}-service`}>Service</Label>
+              <Select
+                id={`${fid}-service`}
+                name="service_id"
+                value={serviceId}
+                onChange={(e) => {
+                  setServiceId(e.target.value);
+                  const next = coach.services.find((s) => String(s.id) === e.target.value);
+                  if (next?.duration_min) setMinutes(next.duration_min);
+                }}
+              >
                 {coach.services.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} · {priceLine(s)}
@@ -370,8 +385,9 @@ function BookDialog({
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <Label>Sport</Label>
+              <Label htmlFor={`${fid}-sport`}>Sport</Label>
               <Select
+                id={`${fid}-sport`}
                 name="sport"
                 defaultValue={
                   coach.plays_tennis && !coach.plays_pickleball ? "tennis" : "pickleball"
@@ -383,8 +399,8 @@ function BookDialog({
             </div>
           )}
           <div className="flex flex-col gap-1.5">
-            <Label>Who is this lesson for?</Label>
-            <Select name="player_id" value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
+            <Label htmlFor={`${fid}-who`}>Who is this lesson for?</Label>
+            <Select id={`${fid}-who`} name="player_id" value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
               <option value="me">Me</option>
               {childrenRows.map((child) => (
                 <option key={child.user_id} value={child.user_id}>
@@ -400,17 +416,25 @@ function BookDialog({
             ) : null}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>When</Label>
-            <Input name="starts_at" type="datetime-local" required />
+            <Label htmlFor={`${fid}-when`}>When</Label>
+            <Input id={`${fid}-when`} name="starts_at" type="datetime-local" required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>Minutes</Label>
-              <Input name="duration_min" type="number" defaultValue={60} min={30} max={180} />
+              <Label htmlFor={`${fid}-min`}>Minutes</Label>
+              <Input
+                id={`${fid}-min`}
+                name="duration_min"
+                type="number"
+                value={minutes}
+                onChange={(e) => setMinutes(Number(e.target.value))}
+                min={15}
+                max={180}
+              />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Weeks (recurring)</Label>
-              <Input name="recur_weeks" type="number" defaultValue={1} min={1} max={12} />
+              <Label htmlFor={`${fid}-weeks`}>Weeks (repeat weekly)</Label>
+              <Input id={`${fid}-weeks`} name="recur_weeks" type="number" defaultValue={1} min={1} max={12} />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
@@ -418,8 +442,8 @@ function BookDialog({
             Standing lesson, no end date
           </label>
           <div className="flex flex-col gap-1.5">
-            <Label>Timezone</Label>
-            <Select name="timezone" defaultValue={DEFAULT_LESSON_TIMEZONE}>
+            <Label htmlFor={`${fid}-tz`}>Timezone</Label>
+            <Select id={`${fid}-tz`} name="timezone" defaultValue={DEFAULT_LESSON_TIMEZONE}>
               {LESSON_TIMEZONES.map((zone) => (
                 <option key={zone} value={zone}>
                   {zone}
@@ -428,8 +452,9 @@ function BookDialog({
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Court</Label>
+            <Label htmlFor={`${fid}-court`}>Court</Label>
             <Select
+              id={`${fid}-court`}
               name="court_id"
               defaultValue={String(
                 tennisCourt?.id ??
@@ -451,14 +476,33 @@ function BookDialog({
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Note to the coach</Label>
+            <Label htmlFor={`${fid}-note`}>Note to the coach</Label>
             <Textarea
+              id={`${fid}-note`}
               name="notes"
-              placeholder="Working on the third shot. 3.5 doubles. I'm stalled."
+              placeholder="e.g. Working on my serve. I play 3.5 doubles."
             />
             <p className="text-xs text-muted-foreground">
               Sent to the coach with your request. It is not added to the lesson&apos;s session
               notes.
+            </p>
+          </div>
+          <div className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
+            {service ? (
+              <>
+                <span className="font-medium">Price: {priceLine(service)}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {service.name} · {minutes} min
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                The coach confirms the price when they accept.
+              </span>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Nothing is charged now. You pay the coach after the lesson.
             </p>
           </div>
           <Button type="submit" disabled={book.isPending}>

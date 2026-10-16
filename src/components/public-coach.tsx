@@ -150,18 +150,43 @@ export function CoachLinkQr({
   );
 }
 
-export function CoachPublicLinks({ code }: { code: string | null }) {
+export function CoachPublicLinks({
+  code,
+  listed,
+  onTurnOn,
+}: {
+  code: string | null;
+  listed: boolean;
+  onTurnOn?: () => void;
+}) {
   if (!code) return null;
+  if (!listed) {
+    return (
+      <Card>
+        <p className="text-xs tracking-widest text-muted-foreground uppercase">Public page · off</p>
+        <h2 className="mt-2 font-display text-2xl">Your coach page is not public yet</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Until you turn it on, your profile link and booking link show &quot;not found&quot; and you
+          are not listed under Find a coach. Fill in Your page and press Save to turn it on.
+        </p>
+        {onTurnOn ? (
+          <Button type="button" className="mt-4" onClick={onTurnOn}>
+            Turn on my coach page
+          </Button>
+        ) : null}
+      </Card>
+    );
+  }
   return (
     <Card>
-      <p className="text-xs tracking-widest text-muted-foreground uppercase">Public page</p>
+      <p className="text-xs tracking-widest text-muted-foreground uppercase">Public page · on</p>
       <h2 className="mt-2 font-display text-2xl">Your profile and booking link</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Anyone can open these without an account. The profile shows your public prices and a Request
         a lesson button. The booking link goes straight to the request form; requests land on this
-        desk for you to confirm. You are also listed at{" "}
+        desk for you to confirm. You are also listed on{" "}
         <a className="underline" href="/coaches">
-          /coaches
+          Find a coach
         </a>
         .
       </p>

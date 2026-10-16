@@ -44,7 +44,7 @@ function Leagues() {
           <Card>
             <p className="font-display text-xl">No leagues yet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Empty stays empty until someone opens a real roster. Start one if you will run it.
+              No leagues yet. If you will run one, start it here and players can join.
             </p>
           </Card>
         ) : null}

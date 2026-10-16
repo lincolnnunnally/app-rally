@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { listReviews, submitReview, type ReviewRow } from "@/lib/rally-server";
+import { listReviews, reviewEligibility, submitReview, type ReviewRow } from "@/lib/rally-server";
 
 export function ReviewBlock({
   subjectType,
@@ -25,6 +25,11 @@ export function ReviewBlock({
     queryFn: () => listReviews({ data: { subject_type: subjectType, subject_id: subjectId } }),
   });
   const mine = (reviews.data ?? []).find((r) => user && r.reviewer_user_id === user.id);
+  const gate = useQuery({
+    queryKey: ["review-gate", subjectType, subjectId, user?.id ?? ""],
+    queryFn: () => reviewEligibility({ data: { subject_type: subjectType, subject_id: subjectId } }),
+    enabled: !!user && user.id !== subjectId,
+  });
 
   return (
     <div className="mt-8">
@@ -32,14 +37,16 @@ export function ReviewBlock({
       <div className="mt-3 flex flex-col gap-3">
         {reviews.isSuccess && (reviews.data ?? []).length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No reviews yet. Empty stays empty until someone who actually played here writes one.
+            No reviews yet. Only people who have actually {subjectType === "coach" ? "finished a lesson with" : subjectType === "player" ? "played with" : "played at"} {noun} on Rally can leave one.
           </p>
         ) : null}
         {(reviews.data ?? []).map((r) => (
           <ReviewLine key={r.id} review={r} />
         ))}
       </div>
-      {isPending ? null : user ? (
+      {isPending ? null : user && user.id === subjectId ? null : user && gate.data && !gate.data.ok && !mine ? (
+        <p className="mt-4 text-sm text-muted-foreground">{gate.data.reason}</p>
+      ) : user && !gate.data ? null : user ? (
         <ReviewForm
           subjectType={subjectType}
           subjectId={subjectId}

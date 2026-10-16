@@ -1,10 +1,12 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { FormField } from "@/components/ui/form-field";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CoachPricing } from "@/components/coach-pricing";
 import { PlayerSportCards } from "@/components/player-proof";
 import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor, ProofDisplay } from "@/components/proof-lists";
@@ -29,57 +31,60 @@ export function Onboarding({
   onDone: (p: Profile) => void;
 }) {
   const user = useCurrentUser();
+  // Drafts only for first-time setup; editing a saved profile starts from the saved values.
+  const draftKey = existing?.onboarded ? "" : `rally_onboarding_draft:${user?.id ?? "me"}`;
+  const [draft] = useState<Record<string, unknown>>(() => readDraft(draftKey));
+  const d = <T,>(name: string, init: T): T =>
+    draft[name] !== undefined && typeof draft[name] === typeof init ? (draft[name] as T) : init;
   const coaches = useQuery({
     queryKey: ["coaches"],
     queryFn: () => listCoaches(),
     enabled: !!existing?.onboarded,
   });
-  const [displayName, setDisplayName] = useState(
-    existing?.display_name || user?.displayName || "",
-  );
-  const [city, setCity] = useState(existing?.city || "Vidalia");
-  const [tennis, setTennis] = useState(existing?.plays_tennis ?? true);
-  const [pickleball, setPickleball] = useState(existing?.plays_pickleball ?? false);
-  const [tennisLevel, setTennisLevel] = useState(existing?.tennis_level || "3.0");
-  const [pbLevel, setPbLevel] = useState(existing?.pickleball_level || "3.0");
-  const [partners, setPartners] = useState(existing?.looking_for_partners ?? true);
-  const [coach, setCoach] = useState(existing?.looking_for_coach ?? true);
-  const [leagues, setLeagues] = useState(existing?.interested_in_leagues ?? true);
-  const [isCoach, setIsCoach] = useState(existing?.is_coach ?? false);
-  const [availability, setAvailability] = useState(existing?.availability || "");
-  const [bio, setBio] = useState(existing?.bio || "");
-  const [dupr, setDupr] = useState(existing?.dupr ?? "");
-  const [utr, setUtr] = useState(existing?.utr ?? "");
-  const [pbYears, setPbYears] = useState(
-    existing?.pickleball_years?.toString() ??
-      (existing?.plays_pickleball ? existing?.years_playing?.toString() ?? "" : ""),
-  );
-  const [tennisYears, setTennisYears] = useState(
-    existing?.tennis_years?.toString() ??
-      (existing?.plays_tennis ? existing?.years_playing?.toString() ?? "" : ""),
-  );
-  const [pbTimes, setPbTimes] = useState(existing?.pickleball_times?.toString() ?? "");
-  const [tennisTimes, setTennisTimes] = useState(existing?.tennis_times?.toString() ?? "");
-  const [pbFreq, setPbFreq] = useState(existing?.pickleball_frequency ?? "");
-  const [tennisFreq, setTennisFreq] = useState(existing?.tennis_frequency ?? "");
-  const [pbExp, setPbExp] = useState(
-    existing?.pickleball_experience ?? (existing?.plays_pickleball ? existing?.experience ?? "" : ""),
-  );
-  const [tennisExp, setTennisExp] = useState(
-    existing?.tennis_experience ?? (existing?.plays_tennis ? existing?.experience ?? "" : ""),
-  );
-  const [pbResults, setPbResults] = useState(
-    existing?.pickleball_results ?? (existing?.plays_pickleball ? existing?.accomplishments ?? "" : ""),
-  );
-  const [tennisResults, setTennisResults] = useState(
-    existing?.tennis_results ?? (existing?.plays_tennis ? existing?.accomplishments ?? "" : ""),
-  );
-  const [creditCoach, setCreditCoach] = useState(existing?.credit_coach_user_id ?? "");
-  const [coachNote, setCoachNote] = useState(existing?.coach_note ?? "");
+  const [displayName, setDisplayName] = useState(d("displayName", existing?.display_name || user?.displayName || "",));
+  const [city, setCity] = useState(d("city", existing?.city || "Vidalia"));
+  const [tennis, setTennis] = useState(d("tennis", existing?.plays_tennis ?? true));
+  const [pickleball, setPickleball] = useState(d("pickleball", existing?.plays_pickleball ?? false));
+  const [tennisLevel, setTennisLevel] = useState(d("tennisLevel", existing?.tennis_level || "3.0"));
+  const [pbLevel, setPbLevel] = useState(d("pbLevel", existing?.pickleball_level || "3.0"));
+  const [partners, setPartners] = useState(d("partners", existing?.looking_for_partners ?? true));
+  const [coach, setCoach] = useState(d("coach", existing?.looking_for_coach ?? true));
+  const [leagues, setLeagues] = useState(d("leagues", existing?.interested_in_leagues ?? true));
+  const [isCoach, setIsCoach] = useState(d("isCoach", existing?.is_coach ?? false));
+  const [availability, setAvailability] = useState(d("availability", existing?.availability || ""));
+  const [bio, setBio] = useState(d("bio", existing?.bio || ""));
+  const [dupr, setDupr] = useState(d("dupr", existing?.dupr ?? ""));
+  const [utr, setUtr] = useState(d("utr", existing?.utr ?? ""));
+  const [pbYears, setPbYears] = useState(d("pbYears", existing?.pickleball_years?.toString() ??
+      (existing?.plays_pickleball ? existing?.years_playing?.toString() ?? "" : ""),));
+  const [tennisYears, setTennisYears] = useState(d("tennisYears", existing?.tennis_years?.toString() ??
+      (existing?.plays_tennis ? existing?.years_playing?.toString() ?? "" : ""),));
+  const [pbTimes, setPbTimes] = useState(d("pbTimes", existing?.pickleball_times?.toString() ?? ""));
+  const [tennisTimes, setTennisTimes] = useState(d("tennisTimes", existing?.tennis_times?.toString() ?? ""));
+  const [pbFreq, setPbFreq] = useState(d("pbFreq", existing?.pickleball_frequency ?? ""));
+  const [tennisFreq, setTennisFreq] = useState(d("tennisFreq", existing?.tennis_frequency ?? ""));
+  const [pbExp, setPbExp] = useState(d("pbExp", existing?.pickleball_experience ?? (existing?.plays_pickleball ? existing?.experience ?? "" : ""),));
+  const [tennisExp, setTennisExp] = useState(d("tennisExp", existing?.tennis_experience ?? (existing?.plays_tennis ? existing?.experience ?? "" : ""),));
+  const [pbResults, setPbResults] = useState(d("pbResults", existing?.pickleball_results ?? (existing?.plays_pickleball ? existing?.accomplishments ?? "" : ""),));
+  const [tennisResults, setTennisResults] = useState(d("tennisResults", existing?.tennis_results ?? (existing?.plays_tennis ? existing?.accomplishments ?? "" : ""),));
+  const [creditCoach, setCreditCoach] = useState(d("creditCoach", existing?.credit_coach_user_id ?? ""));
+  const [coachNote, setCoachNote] = useState(d("coachNote", existing?.coach_note ?? ""));
   const [photo, setPhoto] = useState<string | null>(existing?.photo_data ?? null);
   const [certs, setCerts] = useState<CertItem[]>(existing?.certs ?? []);
   const [honors, setHonors] = useState<HonorItem[]>(existing?.honors ?? []);
   const [error, setError] = useState<string | null>(null);
+  // A refresh mid-form should not wipe what someone typed (bio, results, …).
+  useEffect(() => {
+    writeDraft(draftKey, {
+      displayName, city, tennis, pickleball, tennisLevel, pbLevel, partners, coach, leagues,
+      isCoach, availability, bio, dupr, utr, pbYears, tennisYears, pbTimes, tennisTimes, pbFreq,
+      tennisFreq, pbExp, tennisExp, pbResults, tennisResults, creditCoach, coachNote,
+    });
+  }, [
+    draftKey, displayName, city, tennis, pickleball, tennisLevel, pbLevel, partners, coach,
+    leagues, isCoach, availability, bio, dupr, utr, pbYears, tennisYears, pbTimes, tennisTimes,
+    pbFreq, tennisFreq, pbExp, tennisExp, pbResults, tennisResults, creditCoach, coachNote,
+  ]);
   const [saving, setSaving] = useState(false);
 
   const preview = {
@@ -146,6 +151,7 @@ export function Onboarding({
         },
       });
       clearCoach();
+      clearDraft(draftKey);
       onDone(profile);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -163,8 +169,9 @@ export function Onboarding({
         {existing?.onboarded ? "Your profile" : "Get on Rally"}
       </h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Tennis and pickleball are different games. Check tennis if you are here for lessons. Check
-        “I coach” if you teach. A parent can book a kid later without the kid needing an account.
+        Tennis and pickleball are different games, so each gets its own skill level. Check “I
+        coach” at the bottom only if you teach. A parent can book a kid later without the kid
+        needing an account.
       </p>
       <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
         <PhotoPicker name={displayName || "You"} photo={photo} onChange={setPhoto} />
@@ -174,8 +181,8 @@ export function Onboarding({
         <Field label="City">
           <Input value={city} onChange={(e) => setCity(e.target.value)} required />
         </Field>
-        <div>
-          <Label>Sports</Label>
+        <div role="group" aria-label="Sports">
+          <p className="text-sm font-medium">Sports</p>
           <div className="mt-2 flex gap-2">
             <Toggle on={pickleball} onClick={() => setPickleball((v) => !v)}>
               Pickleball
@@ -189,7 +196,7 @@ export function Onboarding({
         {pickleball ? (
           <SportSection title="Pickleball">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Skill">
+              <Field label="Skill" hint="1.0 brand new · 3.0 can rally and keep score · 4.0+ tournament level">
                 <Select value={pbLevel} onChange={(e) => setPbLevel(e.target.value)}>
                   {LEVELS.map((l) => (
                     <option key={l} value={l}>
@@ -198,8 +205,11 @@ export function Onboarding({
                   ))}
                 </Select>
               </Field>
-              <Field label="DUPR (optional)">
-                <Input value={dupr} onChange={(e) => setDupr(e.target.value)} placeholder="3.62" />
+              <Field
+                label="DUPR (optional)"
+                hint="A pickleball rating (2.0–8.0) from recorded match results. Skip it if you don't have one."
+              >
+                <Input value={dupr} onChange={(e) => setDupr(e.target.value)} placeholder="e.g. 3.62" />
               </Field>
               <Field label="Years">
                 <Input
@@ -208,7 +218,7 @@ export function Onboarding({
                   type="number"
                   min={0}
                   max={80}
-                  placeholder="1"
+                  placeholder="e.g. 1"
                 />
               </Field>
               <Field label="How often">
@@ -229,7 +239,7 @@ export function Onboarding({
                 type="number"
                 min={0}
                 max={9999}
-                placeholder="5"
+                placeholder="e.g. 5"
               />
               <p className="text-xs text-muted-foreground">
                 Useful when you just started — “a year, but only five times.”
@@ -239,14 +249,14 @@ export function Onboarding({
               <Textarea
                 value={pbExp}
                 onChange={(e) => setPbExp(e.target.value)}
-                placeholder="Picked up a paddle a year ago. Rec nights when I can."
+                placeholder="e.g. Picked up a paddle a year ago. Rec nights when I can."
               />
             </Field>
             <Field label="Results">
               <Textarea
                 value={pbResults}
                 onChange={(e) => setPbResults(e.target.value)}
-                placeholder="Moved off the Sunday beginner hour."
+                placeholder="e.g. Moved up from the Sunday beginner group."
               />
             </Field>
           </SportSection>
@@ -255,7 +265,10 @@ export function Onboarding({
         {tennis ? (
           <SportSection title="Tennis">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="NTRP">
+              <Field
+                label="NTRP level"
+                hint="The 1.0–7.0 tennis scale used by rec leagues. 2.5 learning to rally · 3.5 steady club player · 4.5 strong tournament player."
+              >
                 <Select value={tennisLevel} onChange={(e) => setTennisLevel(e.target.value)}>
                   {LEVELS.map((l) => (
                     <option key={l} value={l}>
@@ -264,8 +277,11 @@ export function Onboarding({
                   ))}
                 </Select>
               </Field>
-              <Field label="UTR (optional)">
-                <Input value={utr} onChange={(e) => setUtr(e.target.value)} placeholder="4.2" />
+              <Field
+                label="UTR (optional)"
+                hint="Universal Tennis Rating (1–16), from match results. Skip it if you don't have one."
+              >
+                <Input value={utr} onChange={(e) => setUtr(e.target.value)} placeholder="e.g. 4.2" />
               </Field>
               <Field label="Years">
                 <Input
@@ -274,7 +290,7 @@ export function Onboarding({
                   type="number"
                   min={0}
                   max={80}
-                  placeholder="30"
+                  placeholder="e.g. 10"
                 />
               </Field>
               <Field label="How often">
@@ -295,21 +311,21 @@ export function Onboarding({
                 type="number"
                 min={0}
                 max={9999}
-                placeholder="Leave blank if years already says it"
+                placeholder="e.g. 20 (optional)"
               />
             </Field>
             <Field label="Your tennis">
               <Textarea
                 value={tennisExp}
                 onChange={(e) => setTennisExp(e.target.value)}
-                placeholder="High school and rec tennis for decades."
+                placeholder="e.g. High school tennis, then rec leagues."
               />
             </Field>
             <Field label="Results">
               <Textarea
                 value={tennisResults}
                 onChange={(e) => setTennisResults(e.target.value)}
-                placeholder="Stockyard singles. Holds a 4.0 on these courts."
+                placeholder="e.g. Won the fall singles ladder."
               />
             </Field>
           </SportSection>
@@ -319,14 +335,14 @@ export function Onboarding({
           <Input
             value={availability}
             onChange={(e) => setAvailability(e.target.value)}
-            placeholder="Weeknights after 5, Saturday morning"
+            placeholder="e.g. Weeknights after 5, Saturday mornings"
           />
         </Field>
         <Field label="Short bio">
           <Textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            placeholder="Looking for a hitting partner on Sundays."
+            placeholder="e.g. Looking for a hitting partner on Sundays."
           />
         </Field>
         <CertEditor items={certs} onChange={setCerts} />
@@ -362,7 +378,7 @@ export function Onboarding({
                 <Input
                   value={coachNote}
                   onChange={(e) => setCoachNote(e.target.value)}
-                  placeholder="Quinn fixed my third shot."
+                  placeholder="e.g. Fixed my serve toss."
                 />
               </Field>
             ) : null}
@@ -372,8 +388,9 @@ export function Onboarding({
           <CheckRow checked={partners} onChange={setPartners} label="Looking for hitting partners" />
           <CheckRow checked={coach} onChange={setCoach} label="Looking for a coach" />
           <CheckRow checked={leagues} onChange={setLeagues} label="Interested in leagues" />
-          <CheckRow checked={isCoach} onChange={setIsCoach} label="I coach — list me on the board" />
+          <CheckRow checked={isCoach} onChange={setIsCoach} label="I coach — set up a coach page" />
         </div>
+        {isCoach ? <CoachPricing className="mb-0" /> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={saving}>
           {saving ? "Saving…" : existing?.onboarded ? "Save profile" : "Enter Rally"}
@@ -392,13 +409,41 @@ function SportSection({ title, children }: { title: string; children: ReactNode 
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2">
-      <Label>{label}</Label>
+    <FormField label={label} hint={hint} className="flex flex-col gap-2">
       {children}
-    </div>
+    </FormField>
   );
+}
+
+function readDraft(key: string): Record<string, unknown> {
+  if (!key || typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    const v = raw ? JSON.parse(raw) : {};
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDraft(key: string, value: Record<string, unknown>) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage full or blocked: drafts are a nicety */
+  }
+}
+
+function clearDraft(key: string) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
 }
 
 function Toggle({

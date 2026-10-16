@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { LEVELS, SESSION_FORMATS, formatWall, sportLabel } from "@/lib/rally";
@@ -93,7 +93,7 @@ function Play() {
           </Card>
         ))}
         {sessions.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading the board…</p>
+          <p className="text-sm text-muted-foreground">Loading open play…</p>
         ) : null}
         {sessions.isError ? (
           <p className="text-sm text-destructive">
@@ -104,8 +104,8 @@ function Play() {
           <Card>
             <p className="font-display text-xl">Nothing posted yet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Empty stays empty until someone hosts a session. Rec hours also show on Today when they
-              are on the board.
+              No one has posted open play yet. When someone does, or the Rec posts its hours, it shows
+              up here and on Today.
             </p>
           </Card>
         ) : null}
@@ -224,10 +224,5 @@ function HostDialog({ courts }: { courts: Court[] }) {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
+  return <FormField label={label}>{children}</FormField>;
 }

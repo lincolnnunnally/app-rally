@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -213,7 +214,7 @@ function Courts() {
               <div className="mt-4 border-t border-border pt-4">
                 <p className="text-xs tracking-widest text-muted-foreground uppercase">Reserved</p>
                 {upcoming.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">Open on the board.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Open on Rally.</p>
                 ) : (
                   <ul className="mt-2 flex flex-col gap-2">
                     {upcoming.map((r) => (
@@ -363,7 +364,7 @@ function AddFacility({ onSaved }: { onSaved: () => void }) {
   const save = useMutation({
     mutationFn: (data: Parameters<typeof registerCourt>[0]["data"]) => registerCourt({ data }),
     onSuccess: () => {
-      toast.success("Facility on the board.");
+      toast.success("Facility listed on Rally.");
       setPhoto(null);
       setOpen(false);
       onSaved();
@@ -517,10 +518,5 @@ function AddFacility({ onSaved }: { onSaved: () => void }) {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
+  return <FormField label={label}>{children}</FormField>;
 }

@@ -144,7 +144,7 @@ function CityPage() {
             ))}
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">
-            Book from the board after you join. Players who credit a coach put results on that listing.
+            Book a lesson after you join. Players who credit a coach put results on that listing.
           </p>
         </section>
       ) : null}

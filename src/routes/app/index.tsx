@@ -61,7 +61,7 @@ function Today() {
           <p className="text-xs tracking-widest text-muted-foreground uppercase">Coach</p>
           <p className="mt-2 font-display text-xl">Your desk</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Confirm requests, log Monday and Tuesday, put a kid lesson on the board.
+            Confirm requests, log lessons, and schedule a kid’s lesson.
           </p>
           <Link to="/app/desk" className="mt-3 flex items-center justify-between text-sm">
             Open the coach desk
@@ -115,7 +115,7 @@ function Today() {
           <p className="text-xs tracking-widest text-muted-foreground uppercase">Lessons</p>
           <p className="mt-2 font-display text-xl">Book a coach</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            For you or your kid. Ed Smith Complex (Smith Park / Vidalia Rec) is on the court list.
+            For you or your kid. Lessons are usually at Ed Smith Complex, the public courts at Smith Park in Vidalia.
           </p>
           <Link
             to="/app/coaches"
@@ -184,12 +184,12 @@ function Today() {
             </Card>
           ) : null}
 
-          <Section title="You are on the board" to="/app/play">
+          <Section title="Open play you joined" to="/app/play">
             {feed.data.mySessions.length === 0 ? (
               <Empty>
                 You have not RSVP’d to open play yet.{" "}
                 <Link to="/app/play" className="text-foreground">
-                  See the board
+                  See open play
                 </Link>
               </Empty>
             ) : (
@@ -208,7 +208,7 @@ function Today() {
               <Empty>
                 No reservations on the books.{" "}
                 <Link to="/app/courts" className="text-foreground">
-                  Claim a window
+                  Reserve a court time
                 </Link>
               </Empty>
             ) : (

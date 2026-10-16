@@ -96,7 +96,7 @@ export function PhotoPicker({
             Remove photo
           </button>
         ) : (
-          <p className="text-xs text-muted-foreground">A face photo helps people know who they are meeting at Ed Smith.</p>
+          <p className="text-xs text-muted-foreground">A face photo helps people know who they are meeting at the courts.</p>
         )}
       </div>
     </div>

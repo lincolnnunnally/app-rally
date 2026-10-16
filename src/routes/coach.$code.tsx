@@ -25,10 +25,18 @@ export const Route = createFileRoute("/coach/$code")({
   notFoundComponent: () => (
     <PublicChrome>
       <main className="mx-auto max-w-lg px-5 pb-16">
-        <h1 className="mt-2 font-display text-4xl">Coach not found</h1>
-        <Link to="/coaches" className="mt-4 inline-block underline">
-          See coaches
-        </Link>
+        <h1 className="mt-2 font-display text-4xl">This coach page is not public</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          The link may be mistyped, or the coach has not turned on their page yet.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link to="/coaches" className="underline">
+            Find a coach
+          </Link>
+          <Link to="/app/desk" className="text-muted-foreground underline">
+            Is this your page? Turn it on from your coach desk
+          </Link>
+        </div>
       </main>
     </PublicChrome>
   ),

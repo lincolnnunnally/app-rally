@@ -76,7 +76,16 @@ export function ShareRally({ code, creditCents }: { code: string | null; creditC
   );
 }
 
-export function CoachInvite({ code, coachName }: { code: string | null; coachName: string }) {
+export function CoachInvite({
+  code,
+  coachName,
+  coachPage,
+}: {
+  code: string | null;
+  coachName: string;
+  /** Public profile/booking links: on only once the coach page is saved. */
+  coachPage?: { listed: boolean; onTurnOn?: () => void } | null;
+}) {
   const [copied, setCopied] = useState(false);
   if (!code) return null;
 
@@ -86,7 +95,7 @@ export function CoachInvite({ code, coachName }: { code: string | null; coachNam
       ? `https://rally.unitedundergod.org${path}`
       : `${window.location.origin}${path}`;
   const qrSrc = rallyQrSrc(url);
-  const textBody = `Join me on Rally for tennis at Ed Smith (Smith Park / Vidalia Rec). Create your profile here and you'll be on my coaching list — you can also find people to hit with: ${url} — already on Rally? Request a lesson time here: ${absoluteRallyUrl(coachBookPath(code))}`;
+  const textBody = `Join me on Rally for tennis at Ed Smith Complex (Smith Park, Vidalia). Create your profile here and you'll be on my coaching list — you can also find people to hit with: ${url} — already on Rally? Request a lesson time here: ${absoluteRallyUrl(coachBookPath(code))}`;
 
   async function copy() {
     try {
@@ -154,7 +163,9 @@ export function CoachInvite({ code, coachName }: { code: string | null; coachNam
           </Button>
         </div>
       </Card>
-      <CoachPublicLinks code={code} />
+      {coachPage ? (
+        <CoachPublicLinks code={code} listed={coachPage.listed} onTurnOn={coachPage.onTurnOn} />
+      ) : null}
     </>
   );
 }

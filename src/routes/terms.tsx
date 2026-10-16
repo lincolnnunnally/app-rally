@@ -46,9 +46,10 @@ function TermsPage() {
         </ul>
         <h2 className="font-display text-xl text-foreground">3. Money</h2>
         <p>
-          Rally may record a platform split when a facility or coach already charges a fee. Rec
-          courts at $0 stay $0. Card checkout is not live yet — we do not take payment in the app
-          until that path is proven. Do not send Rally money expecting automated collection.
+          Players use Rally free. Coaches pay $100 a year plus 5% of lessons paid by credit card
+          (no cap); Cash App and Venmo payments carry no Rally fee. Facilities pay a percentage of
+          paid bookings and league fees; courts at $0 stay $0. Card checkout is not live yet — we do
+          not take payment in the app today. Do not send Rally money expecting automated collection.
         </p>
         <h2 className="font-display text-xl text-foreground">4. Accounts</h2>
         <p>

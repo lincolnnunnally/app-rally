@@ -72,7 +72,11 @@ function You() {
             </div>
           </Card>
         </Link>
-        {LINKS.map((l) => (
+        {LINKS.map((l) =>
+          l.to === "/app/desk" && !profile.is_coach
+            ? { ...l, title: "I coach", body: "Set up a coach page. See pricing first." }
+            : l,
+        ).map((l) => (
           <Link key={l.to} to={l.to}>
             <Card className="flex items-center gap-4 transition-colors duration-150 hover:border-primary/40">
               <l.icon className="size-5 text-primary" />

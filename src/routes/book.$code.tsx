@@ -50,11 +50,19 @@ function BookPage() {
         <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Book a lesson</p>
         {!coach ? (
           <>
-            <h1 className="mt-2 font-display text-4xl">Coach not found</h1>
-            <p className="mt-3 text-sm text-muted-foreground">Ask your coach for a fresh link.</p>
-            <Button className="mt-6" asChild>
-              <Link to="/coaches">See coaches</Link>
-            </Button>
+            <h1 className="mt-2 font-display text-4xl">This booking link is not active</h1>
+            <p className="mt-3 text-sm text-muted-foreground">
+              The coach has not turned on their page yet, or the link is mistyped. Ask your coach
+              for a fresh link, or find a coach below.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button asChild>
+                <Link to="/coaches">Find a coach</Link>
+              </Button>
+              <Link to="/app/desk" className="text-sm text-muted-foreground underline">
+                Is this your link? Turn on your page
+              </Link>
+            </div>
           </>
         ) : (
           <>

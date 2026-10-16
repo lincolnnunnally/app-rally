@@ -45,9 +45,11 @@ function Home() {
           <Button asChild variant="ghost" className="hidden sm:inline-flex">
             <Link to="/where">Find a court</Link>
           </Button>
-          {isPending ? (
-            <div className="h-11 w-24 animate-pulse rounded-md bg-secondary" />
-          ) : user ? (
+          <Button asChild variant="ghost" className="hidden sm:inline-flex">
+            <Link to="/coaches">Find a coach</Link>
+          </Button>
+          {/* Until auth resolves, show the signed-out buttons (real links) instead of blank boxes. */}
+          {!isPending && user ? (
             <Button asChild>
               <Link to="/app">Open Rally</Link>
             </Button>
@@ -96,11 +98,9 @@ function Home() {
             <Button asChild size="lg" className={BTN}>
               <Link to="/where">Find a court</Link>
             </Button>
-            {isPending ? (
-              <div className="h-[54px] w-40 animate-pulse rounded-md bg-secondary" />
-            ) : user ? (
+            {!isPending && user ? (
               <Button asChild size="lg" variant="outline" className={BTN}>
-                <Link to="/app">Go to your board</Link>
+                <Link to="/app">Open Rally</Link>
               </Button>
             ) : (
               <Button asChild size="lg" variant="outline" className={BTN}>
@@ -110,6 +110,12 @@ function Home() {
               </Button>
             )}
           </div>
+          <p className={`mt-5 text-base ${MUTED}`}>
+            Want lessons?{" "}
+            <Link to="/coaches" className="text-foreground underline underline-offset-4">
+              Find a coach
+            </Link>
+          </p>
         </div>
         <figure className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/50">
           <div className="flex h-8 items-center gap-1.5 bg-secondary px-3">
@@ -201,7 +207,8 @@ function Home() {
             <h2 className="font-display text-3xl">If you coach</h2>
             <p className={`mt-3 ${MUTED}`}>
               A menu, not one hourly rate. Players who credit you put results on your card.
-              Recurring lessons and the books live on your desk.
+              Recurring lessons and the books live on your desk. $100 a year plus 5% on card
+              payments; Cash App and Venmo payments are free.
             </p>
             <Button asChild className={`mt-6 ${BTN}`}>
               {user ? (
@@ -217,7 +224,7 @@ function Home() {
       </section>
 
       <footer className={`border-t border-border px-5 py-8 text-center text-base ${MUTED}`}>
-        Rally — tennis and pickleball. Eastern time on the board.
+        Rally — tennis and pickleball. All times Eastern.
         {" · "}
         <Link to="/privacy" className="inline-flex min-h-11 items-center hover:text-foreground">
           Privacy

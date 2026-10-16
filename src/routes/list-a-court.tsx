@@ -5,7 +5,7 @@ import { PublicChrome } from "@/components/public-chrome";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FacilityPhotoPicker } from "@/components/facility-place";
@@ -99,7 +99,7 @@ function ListACourt() {
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Rally is the app. The rec, the club, the school — those are facilities listed on it. Add
           one and Rally starts taking reservations, or holding a window for a call, the same day.
-          Listing is free. It does require an account so the board is not anonymous spam.
+          Listing is free. It does require an account so listings are not anonymous spam.
         </p>
 
         {!isPending && !user ? (
@@ -204,10 +204,5 @@ function ListACourt() {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
+  return <FormField label={label}>{children}</FormField>;
 }

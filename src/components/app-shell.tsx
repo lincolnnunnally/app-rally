@@ -6,6 +6,7 @@ import {
   GraduationCap,
   House,
   MapPin,
+  Menu,
   UserRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -76,6 +77,7 @@ export function AppShell() {
           <div className="hidden md:block">
             <UserButton />
           </div>
+          <AccountMenu />
         </div>
       </header>
 
@@ -180,6 +182,41 @@ function NoticeBell() {
               })}
             </ul>
           )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Phones hide the header account controls, so Sign out lives behind this menu. */
+function AccountMenu() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+  return (
+    <div className="relative md:hidden">
+      <button
+        type="button"
+        className="flex size-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+        aria-label="Account menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Menu className="size-5" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3">
+          <UserButton />
+          <div className="mt-3 flex flex-col border-t border-border pt-2 text-sm">
+            <Link to="/app/profile" className="py-2 text-muted-foreground hover:text-foreground">
+              Edit profile
+            </Link>
+            <Link to="/app/you" className="py-2 text-muted-foreground hover:text-foreground">
+              Everything else
+            </Link>
+          </div>
         </div>
       ) : null}
     </div>

@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,10 +28,10 @@ import { PlayerProofBlock } from "@/components/player-proof";
 import { PhotoPicker } from "@/components/profile-face";
 import { CertEditor, HonorEditor } from "@/components/proof-lists";
 import { CheckInQr } from "@/components/checkin-qr";
+import { CoachPricing } from "@/components/coach-pricing";
 import { CoachInvite, PayHandleShow, PayHandles, ShareRally } from "@/components/share-rally";
 import {
   LEVELS,
-  RALLY,
   SERVICE_KINDS,
   SERVICE_UNITS,
   formatWall,
@@ -45,7 +45,6 @@ import {
   deleteCoachService,
   getCoachDesk,
   logLesson,
-  saveCoachBilling,
   saveCoachPayHandles,
   saveCoachProfile,
   notifyRosterService,
@@ -57,11 +56,57 @@ import {
 
 export const Route = createFileRoute("/app/desk")({ component: Desk });
 
+/** Players who did not choose "I coach" get a player view, not the coach desk. */
+function NotACoach({
+  desk,
+  isSuccess,
+  onSaved,
+}: {
+  desk: Awaited<ReturnType<typeof getCoachDesk>> | undefined;
+  isSuccess: boolean;
+  onSaved: () => void;
+}) {
+  const { profile } = useRally();
+  const [start, setStart] = useState(false);
+  return (
+    <div className="px-5 py-8">
+      <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Coaching</p>
+      <h1 className="mt-2 font-display text-4xl">You are set up as a player</h1>
+      <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+        Looking for lessons? Find a coach and request a time. If you teach tennis or pickleball,
+        you can open a coach page here.
+      </p>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button asChild>
+          <Link to="/app/coaches">Find a coach</Link>
+        </Button>
+        {!start ? (
+          <Button variant="outline" onClick={() => setStart(true)}>
+            I coach — set up my coach page
+          </Button>
+        ) : null}
+      </div>
+      {start ? (
+        <div className="mt-6">
+          <CoachPricing />
+          {isSuccess ? (
+            <ListingForm profile={profile} existing={desk?.coach ?? null} onSaved={onSaved} />
+          ) : (
+            <Card className="h-40 animate-pulse bg-secondary" />
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
 function Desk() {
   const { profile, courts } = useRally();
   const qc = useQueryClient();
   const desk = useQuery({ queryKey: ["desk"], queryFn: () => getCoachDesk(), refetchInterval: 15000 });
   const [payFor, setPayFor] = useState<LessonRow | null>(null);
+  const [tab, setTab] = useState("board");
   const setStatus = useMutation({
     mutationFn: (data: {
       id: number;
@@ -107,14 +152,17 @@ function Desk() {
         .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))[0]
     : undefined;
 
+  if (!profile.is_coach) {
+    return <NotACoach desk={desk.data} isSuccess={desk.isSuccess} onSaved={refreshDesk} />;
+  }
+
   return (
     <div className="px-5 py-8">
       <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Coach desk</p>
-      <h1 className="mt-2 font-display text-4xl">Your business on the board</h1>
+      <h1 className="mt-2 font-display text-4xl">Your coaching business</h1>
       <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-        Listing, a real service menu, incoming requests, recurring hours, the
-        books. Players book. You confirm. The gap two weeks out is the one we
-        flag.
+        Your public page, your lesson menu, incoming requests, recurring lessons, and your
+        books. Players request a time; you confirm it. If next week looks empty, we flag it.
       </p>
 
       {pipeline?.gap ? (
@@ -138,16 +186,26 @@ function Desk() {
         </Card>
       ) : null}
 
-      <Tabs defaultValue="board" className="mt-8">
+      <Tabs value={tab} onValueChange={setTab} className="mt-8">
         <TabsList>
-          <TabsTrigger value="board">Board</TabsTrigger>
-          <TabsTrigger value="listing">Listing</TabsTrigger>
+          <TabsTrigger value="board">Lessons</TabsTrigger>
+          <TabsTrigger value="listing">Your page</TabsTrigger>
           <TabsTrigger value="books">Books</TabsTrigger>
         </TabsList>
 
         <TabsContent value="board" className="mt-6">
           <div className="mb-8">
-            <CoachInvite code={profile.share_code} coachName={profile.display_name} />
+            <CoachInvite
+              code={profile.share_code}
+              coachName={profile.display_name}
+              coachPage={{
+                listed: Boolean(desk.data?.coach),
+                onTurnOn: () => {
+                  setTab("listing");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                },
+              }}
+            />
           </div>
           <StudentsPanel students={desk.data?.students ?? []} onSaved={refreshDesk} />
           <div className="mt-8">
@@ -191,7 +249,7 @@ function Desk() {
           <section className="mt-10">
             <h2 className="font-display text-2xl">Weather day</h2>
             <p className="mt-1 max-w-lg text-sm text-muted-foreground">
-              Cancel every open lesson you have on one day. They stay on the board as canceled,
+              Cancel every open lesson you have on one day. They stay on your calendar as canceled,
               with the reason. Other coaches are left alone. Players get a notice.
             </p>
             <WeatherCancelForm />
@@ -346,7 +404,7 @@ function Desk() {
           <section className="mt-10">
             <h2 className="font-display text-2xl">Canceled</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Weather days and other cancels stay on the board. The row is not deleted.
+              Weather days and other cancels stay on your calendar. The row is not deleted.
             </p>
             {canceled.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No canceled lessons in this list.</p>
@@ -469,7 +527,6 @@ function Desk() {
         <TabsContent value="books" className="mt-6">
           {desk.data?.billing ? (
             <BillingCard
-              listed={Boolean(desk.data.coach)}
               billing={desk.data.billing}
               onChanged={refreshDesk}
             />
@@ -610,7 +667,7 @@ function LogLessonForm({
           Standing lesson, no end date
         </label>
         <p className="text-xs text-muted-foreground">
-          Standing skips the 12-week cap and keeps the next 12 weeks on the board. Fixed series can
+          Standing skips the 12-week cap and keeps the next 12 weeks on your calendar. Fixed series can
           Extend or Renew later.
         </p>
         <Field label="When">
@@ -1179,22 +1236,12 @@ function ServicesPanel({
 }
 
 function BillingCard({
-  listed,
   billing,
   onChanged,
 }: {
-  listed: boolean;
   billing: CoachBilling;
   onChanged: () => void;
 }) {
-  const save = useMutation({
-    mutationFn: (plan: "percent" | "monthly") => saveCoachBilling({ data: { plan } }),
-    onSuccess: () => {
-      toast.success("Billing saved.");
-      onChanged();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
   const saveHandles = useMutation({
     mutationFn: (data: { cash_app: string; venmo: string }) => saveCoachPayHandles({ data }),
     onSuccess: () => {
@@ -1205,50 +1252,25 @@ function BillingCard({
   });
 
   return (
-    <Card className="mb-4">
-      <p className="text-xs tracking-widest text-muted-foreground uppercase">Rally take</p>
-      <h2 className="mt-2 font-display text-xl">
-        {billing.in_trial
-          ? `Trial through ${billing.trial_ends}`
-          : billing.plan === "monthly"
-            ? `${money(RALLY.monthlyCents)} / month`
-            : `${RALLY.lessonPct}% of completed lessons`}
-      </h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Rally records the intended split: {RALLY.trialDays} days after you list, then{" "}
-        {RALLY.lessonPct}% of each completed lesson, or {money(RALLY.monthlyCents)} a month.
-        Rec at $0 stays $0. Card checkout is not on yet — Rally does not take payment in the
-        app until that path is proven.
-      </p>
-      {billing.take_this_month > 0 ? (
-        <p className="mt-2 text-sm">Rally this month: {money(billing.take_this_month)}</p>
-      ) : null}
-      {listed ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant={billing.stored === "percent" ? "default" : "outline"}
-            onClick={() => save.mutate("percent")}
-          >
-            {RALLY.lessonPct}% per lesson
-          </Button>
-          <Button
-            size="sm"
-            variant={billing.stored === "monthly" ? "default" : "outline"}
-            onClick={() => save.mutate("monthly")}
-          >
-            {money(RALLY.monthlyCents)} / month
-          </Button>
-        </div>
-      ) : null}
-      <PayHandles
-        key={`${billing.cash_app_handle ?? ""}:${billing.venmo_handle ?? ""}`}
-        cashApp={billing.cash_app_handle}
-        venmo={billing.venmo_handle}
-        pending={saveHandles.isPending}
-        onSave={(data) => saveHandles.mutate(data)}
-      />
-    </Card>
+    <div className="mb-4">
+      <CoachPricing className="mb-0" />
+      <Card className="mt-3">
+        {billing.take_this_month > 0 ? (
+          <p className="text-sm">Recorded this month (no money moved): {money(billing.take_this_month)}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Players pay you directly. Add your Cash App or Venmo below so they can pay with no fee.
+          </p>
+        )}
+        <PayHandles
+          key={`${billing.cash_app_handle ?? ""}:${billing.venmo_handle ?? ""}`}
+          cashApp={billing.cash_app_handle}
+          venmo={billing.venmo_handle}
+          pending={saveHandles.isPending}
+          onSave={(data) => saveHandles.mutate(data)}
+        />
+      </Card>
+    </div>
   );
 }
 
@@ -1367,12 +1389,7 @@ function BooksPanel({
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
+  return <FormField label={label}>{children}</FormField>;
 }
 
 type Listing = {
@@ -1490,7 +1507,7 @@ function ListingForm({
       });
     },
     onSuccess: () => {
-      toast.success("Listing saved. You are on the coach board.");
+      toast.success("Saved. Your public coach page is on and you are listed under Find a coach.");
       onSaved();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1500,7 +1517,11 @@ function ListingForm({
     <Card>
       <div className="flex items-center justify-between">
         <h2 className="font-display text-xl">Listing</h2>
-        {profile.is_coach ? <Badge variant="good">On the board</Badge> : <Badge>Off</Badge>}
+        {existing && profile.is_coach ? (
+          <Badge variant="good">Public page on</Badge>
+        ) : (
+          <Badge>Public page off — save to turn on</Badge>
+        )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Experience and results are what make the price make sense. The menu lives below.
@@ -1517,7 +1538,7 @@ function ListingForm({
           <Input
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
-            placeholder="Tennis lessons at Ed Smith. Beginners and juniors."
+            placeholder="e.g. Tennis lessons at Ed Smith Complex. Beginners and juniors."
           />
         </Field>
         <Field label="Philosophy">

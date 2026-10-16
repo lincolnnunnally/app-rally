@@ -17,7 +17,7 @@ export const LEAGUE_FORMATS = [
 ] as const;
 
 export const BOOKING_MODES = [
-  { value: "claim", label: "Claim a window in Rally" },
+  { value: "claim", label: "Reserve a time in Rally" },
   { value: "call", label: "Call or email to lock it" },
   { value: "walkup", label: "Walk-up / first come" },
 ] as const;
@@ -51,6 +51,9 @@ export const RALLY = {
   trialDays: 30,
   monthlyCents: 1500,
   referralPct: 25,
+  /** Decided coach pricing (display copy). Charging logic still uses lessonPct/monthlyCents. */
+  coachYearCents: 10000,
+  coachCardPct: 5,
 } as const;
 
 export const REF_KEY = "rally_ref";

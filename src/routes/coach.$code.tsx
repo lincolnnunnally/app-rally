@@ -1,4 +1,5 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { PublicChrome } from "@/components/public-chrome";
 import { CoachLinkQr, PublicCoachCard } from "@/components/public-coach";
 import { getPublicCoach } from "@/lib/coach-public-server";
@@ -10,18 +11,18 @@ export const Route = createFileRoute("/coach/$code")({
     if (!coach) throw notFound();
     return coach;
   },
-  head: ({ loaderData: c }) => ({
-    meta: [
-      { title: c ? `${c.display_name} — tennis coach in ${c.city}, GA | Rally` : "Coach | Rally" },
-      {
-        name: "description",
-        content: c
-          ? `${c.display_name} coaches ${c.plays_tennis ? "tennis" : "pickleball"} in ${c.city}, GA.${c.headline ? ` ${c.headline}.` : ""} Request a lesson on Rally.`
-          : "Coach on Rally.",
-      },
-    ],
-    links: c ? [{ rel: "canonical", href: coachProfilePath(c.code) }] : [],
-  }),
+  head: ({ loaderData: c }) => {
+    const head = pageHead({
+      title: c
+        ? `${c.display_name} — ${c.plays_tennis ? "tennis" : "pickleball"} coach in ${c.city}, GA | Rally`
+        : "Coach | Rally",
+      description: c
+        ? `${c.display_name} coaches ${c.plays_tennis ? "tennis" : "pickleball"} in ${c.city}, GA.${c.headline ? ` ${c.headline}.` : ""} Request a lesson on Rally.`
+        : "Coach on Rally.",
+      path: c ? coachProfilePath(c.code) : "/coaches",
+    });
+    return c ? head : { meta: head.meta, links: [] };
+  },
   notFoundComponent: () => (
     <PublicChrome>
       <main className="mx-auto max-w-lg px-5 pb-16">

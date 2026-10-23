@@ -1,19 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { catalogCities, catalogCity } from "@/lib/rally-server";
+import { SERVICE_PAGES, SITE_URL } from "@/lib/seo";
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
-        const proto = host.includes("127.") || host.startsWith("localhost") ? "http" : "https";
-        const origin = host ? `${proto}://${host}` : "";
+      GET: async () => {
+        // Always the production host: a preview or alias must never be the listed address.
+        const origin = SITE_URL;
         const cities = await catalogCities();
         const urls = [
           `${origin}/`,
-          `${origin}/where`,
+          ...SERVICE_PAGES.map((p) => `${origin}${p.path}`),
           `${origin}/join`,
-          `${origin}/list-a-court`,
           `${origin}/privacy`,
           `${origin}/terms`,
         ];

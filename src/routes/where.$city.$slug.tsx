@@ -1,4 +1,5 @@
 import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { ShareListing } from "@/components/share-rally";
 import { DirectionsButton, DirectionsLink, FacilityHero } from "@/components/facility-place";
 import { Badge } from "@/components/ui/badge";
@@ -22,20 +23,14 @@ export const Route = createFileRoute("/where/$city/$slug")({
         ? "tennis and pickleball"
         : "tennis"
       : "pickleball";
-    return {
-      meta: [
-        { title: `${c?.name ?? "Court"} — ${sport} in ${c?.city ?? "Georgia"}, GA | Rally` },
-        {
-          name: "description",
-          content: c
-            ? `${c.name} at ${c.address}, ${c.city}, GA. ${c.court_count} ${sport} courts. ${bookingLabel(c.booking_mode)}. Fees and rules on Rally.`
-            : "Court listing on Rally.",
-        },
-      ],
-      links: c?.slug
-        ? [{ rel: "canonical", href: `/where/${citySlug(c.city)}/${c.slug}` }]
-        : [],
-    };
+    const head = pageHead({
+      title: `${c?.name ?? "Court"} — ${sport} in ${c?.city ?? "Georgia"}, GA | Rally`,
+      description: c
+        ? `${c.name} at ${c.address}, ${c.city}, GA. ${c.court_count} ${sport} courts. ${bookingLabel(c.booking_mode)}. Fees and rules on Rally.`
+        : "Court listing on Rally.",
+      path: c?.slug ? `/where/${citySlug(c.city)}/${c.slug}` : "/where",
+    });
+    return c?.slug ? head : { meta: head.meta, links: [] };
   },
   component: CourtPage,
 });

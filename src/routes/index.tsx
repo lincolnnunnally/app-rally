@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { catalogCities, catalogCity } from "@/lib/rally-server";
 import { bookingLabel, citySlug, kindLabel, sportLabel } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { ServiceLinks } from "@/components/service-links";
+import { SITE_URL, pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -14,17 +16,27 @@ export const Route = createFileRoute("/")({
     ).flatMap((d) => d?.courts ?? []);
     return { cities, courts };
   },
-  head: () => ({
-    meta: [
-      { title: "Rally — tennis and pickleball, managed in one place" },
-      {
-        name: "description",
-        content:
-          "Rally is the app for tennis and pickleball: find a court, reserve a window, get matched with people at your skill level, book a coach, join a league. Find your court.",
-      },
-    ],
-    links: [{ rel: "canonical", href: "/" }],
-  }),
+  head: () =>
+    pageHead({
+      title: "Rally — tennis and pickleball courts, partners, coaches",
+      description:
+        "The app for tennis and pickleball: find a court, reserve a window, join open play, get matched with players at your level, book a coach, and join a league.",
+      path: "/",
+      jsonLd: [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          name: "Rally",
+          url: `${SITE_URL}/`,
+          applicationCategory: "SportsApplication",
+          operatingSystem: "Web",
+          description:
+            "App for tennis and pickleball: court listings, reservations, open play, partner matching, coaches, and leagues.",
+          about: ["Tennis", "Pickleball"],
+          publisher: { "@id": `${SITE_URL}/#org` },
+        },
+      ],
+    }),
   component: Home,
 });
 
@@ -71,20 +83,6 @@ function Home() {
       </header>
 
       <section className="mx-auto grid max-w-6xl gap-10 px-5 pt-8 pb-16 md:pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebApplication",
-              name: "Rally",
-              applicationCategory: "SportsApplication",
-              description:
-                "App for tennis and pickleball: court listings, reservations, open play, coaches, and leagues.",
-              about: ["Tennis", "Pickleball"],
-            }),
-          }}
-        />
         <div>
           <p className="text-sm font-semibold tracking-[0.22em] text-primary uppercase">Tennis · pickleball</p>
           <h1 className="mt-4 font-display text-[44px] leading-[1.04] md:text-[64px]">
@@ -220,6 +218,13 @@ function Home() {
               )}
             </Button>
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="mx-auto max-w-6xl px-5 py-16">
+          <h2 className="font-display text-4xl">What you can do on Rally</h2>
+          <ServiceLinks className="mt-6 grid gap-3 sm:grid-cols-2" itemClassName="rounded-xl border border-border bg-[#161b19] p-5 font-semibold hover:border-primary/40" />
         </div>
       </section>
 

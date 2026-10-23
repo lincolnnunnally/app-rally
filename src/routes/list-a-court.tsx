@@ -1,4 +1,5 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { pageHead, serviceLd } from "@/lib/seo";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { PublicChrome } from "@/components/public-chrome";
@@ -14,17 +15,23 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { submitCourt } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/list-a-court")({
-  head: () => ({
-    meta: [
-      { title: "List a tennis or pickleball court on Rally" },
-      {
-        name: "description",
-        content:
-          "Add a rec, club, school, or public court to Rally. Once it is listed, players can reserve a window or Rally will hold it for a call to the facility.",
-      },
-    ],
-    links: [{ rel: "canonical", href: "/list-a-court" }],
-  }),
+  head: () =>
+    pageHead({
+      title: "List a tennis or pickleball court on Rally",
+      description:
+        "Add a rec, club, school, or public court to Rally. Once it is listed, players can reserve a window or Rally will hold it for a call to the facility.",
+      path: "/list-a-court",
+      jsonLd: [
+        serviceLd({
+          name: "List a tennis or pickleball court",
+          description:
+            "Recs, clubs, and schools list their courts on Rally. Rally posts open play and takes the reservation, or holds a window for a call if that is how the facility books.",
+          path: "/list-a-court",
+          serviceType: "Court listing and reservations for facilities",
+          audience: "Recreation departments, clubs, and schools",
+        }),
+      ],
+    }),
   component: ListACourt,
 });
 

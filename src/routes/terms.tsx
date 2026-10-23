@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { RallyWordmark } from "@/components/brand";
 
 export const Route = createFileRoute("/terms")({
-  head: () => ({
-    meta: [{ title: "Terms — Rally" }],
-  }),
+  head: () =>
+    pageHead({
+      title: "Terms — Rally",
+      description: "The terms for using Rally for tennis and pickleball: what it is for, your responsibilities as a player or coach, what Rally charges, and your account.",
+      path: "/terms",
+    }),
   component: TermsPage,
 });
 

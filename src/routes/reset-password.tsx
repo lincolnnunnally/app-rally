@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { NOINDEX } from "@/lib/seo";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { RallyMark } from "@/components/brand";
 import { authClient, authEnabled } from "@/lib/auth/client";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 type ResetSearch = { token?: string; error?: string };
 
 export const Route = createFileRoute("/reset-password")({
+  head: () => ({ meta: [{ title: "Reset password | Rally" }, NOINDEX] }),
   validateSearch: (s: Record<string, unknown>): ResetSearch => ({
     token: typeof s.token === "string" ? s.token : undefined,
     error: typeof s.error === "string" ? s.error : undefined,

@@ -1,23 +1,28 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { pageHead, serviceLd } from "@/lib/seo";
 import { catalogCities } from "@/lib/rally-server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export const Route = createFileRoute("/where/")({
   loader: () => catalogCities(),
-  head: () => ({
-    meta: [
-      {
-        title: "Tennis and pickleball courts listed on Rally",
-      },
-      {
-        name: "description",
-        content:
-          "Find tennis and pickleball courts listed on Rally. Recs, clubs, and schools — including Vidalia Rec at 102 Stockyard Rd. List a court if yours is missing.",
-      },
-    ],
-    links: [{ rel: "canonical", href: "/where" }],
-  }),
+  head: () =>
+    pageHead({
+      title: "Find a tennis or pickleball court near you | Rally",
+      description:
+        "Find tennis and pickleball courts listed on Rally — recs, clubs, and schools, including Vidalia Rec at 102 Stockyard Rd. Hours, fees, rules, and how to reserve.",
+      path: "/where",
+      jsonLd: [
+        serviceLd({
+          name: "Find and reserve a tennis or pickleball court",
+          description:
+            "Court listings with address, hours, fees, and rules. Rally takes the reservation when the facility allows it, or holds a window while you call.",
+          path: "/where",
+          serviceType: "Tennis and pickleball court listings and reservations",
+          audience: "Tennis and pickleball players",
+        }),
+      ],
+    }),
   component: WhereIndex,
 });
 

@@ -3,6 +3,7 @@ import { RallyWordmark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { ReactNode } from "react";
+import { ServiceLinks } from "@/components/service-links";
 
 export function PublicChrome({
   children,
@@ -47,6 +48,7 @@ export function PublicChrome({
       </header>
       {children}
       <footer className="border-t border-border px-5 py-8 text-center text-xs text-muted-foreground">
+        <ServiceLinks className="mb-4 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm" />
         Rally — tennis and pickleball. Eastern time.
         {" · "}
         <Link to="/privacy" className="hover:text-foreground">

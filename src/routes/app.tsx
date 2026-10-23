@@ -1,4 +1,5 @@
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { NOINDEX } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RallyProvider } from "@/lib/rally-context";
 import { AppShell } from "@/components/app-shell";
@@ -10,6 +11,7 @@ import { rememberAppNext } from "@/lib/rally";
 import { bootstrap } from "@/lib/rally-server";
 
 export const Route = createFileRoute("/app")({
+  head: () => ({ meta: [{ title: "Rally" }, NOINDEX] }),
   component: AppGate,
 });
 

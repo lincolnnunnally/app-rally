@@ -1,4 +1,5 @@
 import { Navigate, createFileRoute, Link } from "@tanstack/react-router";
+import { NOINDEX } from "@/lib/seo";
 import { useEffect, useState, type FormEvent } from "react";
 import { RallyMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/rally";
 
 export const Route = createFileRoute("/login")({
+  head: () => ({ meta: [{ title: "Sign in or join | Rally" }, NOINDEX] }),
   validateSearch: (
     s: Record<string, unknown>,
   ): { ref?: string; coach?: string; mode?: "up" | "in"; next?: string } => ({

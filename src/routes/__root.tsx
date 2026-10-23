@@ -8,6 +8,7 @@ import {
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { ORGANIZATION_LD } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Rally";
@@ -27,6 +28,7 @@ export const Route = createRootRoute({
           "Rally is the app for tennis and pickleball — court listings, reservations, open play, coaches, and leagues. Facilities are listed on Rally.",
       },
       { name: "theme-color", content: "#0c0e0d" },
+      { "script:ld+json": ORGANIZATION_LD },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

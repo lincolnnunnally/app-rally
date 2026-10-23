@@ -12,9 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as CoachesRouteImport } from './routes/coaches'
+import { Route as FindAPartnerRouteImport } from './routes/find-a-partner'
+import { Route as ForCoachesRouteImport } from './routes/for-coaches'
+import { Route as GetBetterRouteImport } from './routes/get-better'
 import { Route as JoinRouteImport } from './routes/join'
+import { Route as LeaguesRouteImport } from './routes/leagues'
 import { Route as ListACourtRouteImport } from './routes/list-a-court'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OpenPlayRouteImport } from './routes/open-play'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
@@ -60,9 +65,29 @@ const CoachesRoute = CoachesRouteImport.update({
   path: '/coaches',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FindAPartnerRoute = FindAPartnerRouteImport.update({
+  id: '/find-a-partner',
+  path: '/find-a-partner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForCoachesRoute = ForCoachesRouteImport.update({
+  id: '/for-coaches',
+  path: '/for-coaches',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GetBetterRoute = GetBetterRouteImport.update({
+  id: '/get-better',
+  path: '/get-better',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JoinRoute = JoinRouteImport.update({
   id: '/join',
   path: '/join',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaguesRoute = LeaguesRouteImport.update({
+  id: '/leagues',
+  path: '/leagues',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ListACourtRoute = ListACourtRouteImport.update({
@@ -73,6 +98,11 @@ const ListACourtRoute = ListACourtRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpenPlayRoute = OpenPlayRouteImport.update({
+  id: '/open-play',
+  path: '/open-play',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -225,9 +255,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/coaches': typeof CoachesRoute
+  '/find-a-partner': typeof FindAPartnerRoute
+  '/for-coaches': typeof ForCoachesRoute
+  '/get-better': typeof GetBetterRoute
   '/join': typeof JoinRoute
+  '/leagues': typeof LeaguesRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
+  '/open-play': typeof OpenPlayRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/robots.txt': typeof RobotsDottxtRoute
@@ -261,9 +296,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/coaches': typeof CoachesRoute
+  '/find-a-partner': typeof FindAPartnerRoute
+  '/for-coaches': typeof ForCoachesRoute
+  '/get-better': typeof GetBetterRoute
   '/join': typeof JoinRoute
+  '/leagues': typeof LeaguesRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
+  '/open-play': typeof OpenPlayRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/robots.txt': typeof RobotsDottxtRoute
@@ -296,9 +336,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/coaches': typeof CoachesRoute
+  '/find-a-partner': typeof FindAPartnerRoute
+  '/for-coaches': typeof ForCoachesRoute
+  '/get-better': typeof GetBetterRoute
   '/join': typeof JoinRoute
+  '/leagues': typeof LeaguesRoute
   '/list-a-court': typeof ListACourtRoute
   '/login': typeof LoginRoute
+  '/open-play': typeof OpenPlayRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/robots.txt': typeof RobotsDottxtRoute
@@ -335,9 +380,14 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/coaches'
+    | '/find-a-partner'
+    | '/for-coaches'
+    | '/get-better'
     | '/join'
+    | '/leagues'
     | '/list-a-court'
     | '/login'
+    | '/open-play'
     | '/privacy'
     | '/reset-password'
     | '/robots.txt'
@@ -371,9 +421,14 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/coaches'
+    | '/find-a-partner'
+    | '/for-coaches'
+    | '/get-better'
     | '/join'
+    | '/leagues'
     | '/list-a-court'
     | '/login'
+    | '/open-play'
     | '/privacy'
     | '/reset-password'
     | '/robots.txt'
@@ -405,9 +460,14 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/coaches'
+    | '/find-a-partner'
+    | '/for-coaches'
+    | '/get-better'
     | '/join'
+    | '/leagues'
     | '/list-a-court'
     | '/login'
+    | '/open-play'
     | '/privacy'
     | '/reset-password'
     | '/robots.txt'
@@ -443,9 +503,14 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   CoachesRoute: typeof CoachesRoute
+  FindAPartnerRoute: typeof FindAPartnerRoute
+  ForCoachesRoute: typeof ForCoachesRoute
+  GetBetterRoute: typeof GetBetterRoute
   JoinRoute: typeof JoinRoute
+  LeaguesRoute: typeof LeaguesRoute
   ListACourtRoute: typeof ListACourtRoute
   LoginRoute: typeof LoginRoute
+  OpenPlayRoute: typeof OpenPlayRoute
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
@@ -481,11 +546,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoachesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/find-a-partner': {
+      id: '/find-a-partner'
+      path: '/find-a-partner'
+      fullPath: '/find-a-partner'
+      preLoaderRoute: typeof FindAPartnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/for-coaches': {
+      id: '/for-coaches'
+      path: '/for-coaches'
+      fullPath: '/for-coaches'
+      preLoaderRoute: typeof ForCoachesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/get-better': {
+      id: '/get-better'
+      path: '/get-better'
+      fullPath: '/get-better'
+      preLoaderRoute: typeof GetBetterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/join': {
       id: '/join'
       path: '/join'
       fullPath: '/join'
       preLoaderRoute: typeof JoinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leagues': {
+      id: '/leagues'
+      path: '/leagues'
+      fullPath: '/leagues'
+      preLoaderRoute: typeof LeaguesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/list-a-court': {
@@ -500,6 +593,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/open-play': {
+      id: '/open-play'
+      path: '/open-play'
+      fullPath: '/open-play'
+      preLoaderRoute: typeof OpenPlayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -786,9 +886,14 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   CoachesRoute: CoachesRoute,
+  FindAPartnerRoute: FindAPartnerRoute,
+  ForCoachesRoute: ForCoachesRoute,
+  GetBetterRoute: GetBetterRoute,
   JoinRoute: JoinRoute,
+  LeaguesRoute: LeaguesRoute,
   ListACourtRoute: ListACourtRoute,
   LoginRoute: LoginRoute,
+  OpenPlayRoute: OpenPlayRoute,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,

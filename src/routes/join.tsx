@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect } from "react";
 import { PublicChrome } from "@/components/public-chrome";
 import { PlayerSportCards } from "@/components/player-proof";
@@ -28,17 +29,13 @@ export const Route = createFileRoute("/join")({
   },
   head: ({ match }) => {
     const tagged = Boolean(match.search.ref || match.search.coach);
-    return {
-      meta: [
-        { title: "Join Rally — tennis and pickleball" },
-        {
-          name: "description",
-          content:
-            "Join Rally to reserve listed courts, get matched with people at your skill level, book a coach, and join a league.",
-        },
-        ...(tagged ? [{ name: "robots", content: "noindex, follow" }] : []),
-      ],
-    };
+    return pageHead({
+      title: "Join Rally — tennis and pickleball",
+      description:
+        "Join Rally to reserve listed courts, join open play, get matched with people at your skill level, book a coach, and join a league.",
+      path: "/join",
+      noindex: tagged,
+    });
   },
   component: Join,
 });

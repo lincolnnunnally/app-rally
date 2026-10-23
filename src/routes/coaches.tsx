@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { pageHead, serviceLd } from "@/lib/seo";
 import { PublicChrome } from "@/components/public-chrome";
 import { PublicCoachCard } from "@/components/public-coach";
 import { Card } from "@/components/ui/card";
@@ -6,17 +7,23 @@ import { listPublicCoaches } from "@/lib/coach-public-server";
 
 export const Route = createFileRoute("/coaches")({
   loader: async () => listPublicCoaches(),
-  head: () => ({
-    meta: [
-      { title: "Tennis and pickleball coaches in Vidalia, GA | Rally" },
-      {
-        name: "description",
-        content:
-          "Coaches on Rally around Vidalia, GA. See prices and request a lesson time; the coach confirms.",
-      },
-    ],
-    links: [{ rel: "canonical", href: "/coaches" }],
-  }),
+  head: () =>
+    pageHead({
+      title: "Tennis and pickleball coaches and lessons | Rally",
+      description:
+        "Tennis and pickleball lessons with coaches on Rally around Vidalia, GA: private, group, hitting, and junior. See prices, request a time; the coach confirms.",
+      path: "/coaches",
+      jsonLd: [
+        serviceLd({
+          name: "Book a tennis or pickleball coach",
+          description:
+            "Request a tennis or pickleball lesson for you or your kid from coaches listed on Rally. See each coach's menu and price; the coach confirms the time.",
+          path: "/coaches",
+          serviceType: "Tennis and pickleball lesson booking",
+          audience: "Tennis and pickleball players and parents",
+        }),
+      ],
+    }),
   component: CoachesPage,
 });
 
@@ -29,6 +36,14 @@ function CoachesPage() {
         <h1 className="mt-2 font-display text-4xl">Book a coach</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Request a lesson time for you or your kid. The coach confirms it.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Coaches set their own menu — private lessons, group clinics, hitting sessions, and juniors —
+          and their own prices. Coach on Rally yourself?{" "}
+          <a href="/for-coaches" className="text-foreground underline underline-offset-4">
+            See the coach desk
+          </a>
+          .
         </p>
         <div className="mt-6 flex flex-col gap-3">
           {coaches.length === 0 ? (

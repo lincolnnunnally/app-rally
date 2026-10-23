@@ -1,4 +1,5 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { ShareListing } from "@/components/share-rally";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,18 +17,13 @@ export const Route = createFileRoute("/where/$city/")({
   head: ({ loaderData }) => {
     const city = loaderData?.city ?? "Georgia";
     const names = (loaderData?.courts ?? []).map((c) => c.name).join(", ");
-    return {
-      meta: [
-        { title: `Tennis and pickleball courts in ${city}, GA | Rally` },
-        {
-          name: "description",
-          content: names
-            ? `Tennis and pickleball in ${city}, Georgia. ${names}. Hours, fees, who books the court, and coaches on Rally.`
-            : `Find tennis and pickleball courts in ${city}, Georgia.`,
-        },
-      ],
-      links: [{ rel: "canonical", href: `/where/${loaderData?.slug ?? ""}` }],
-    };
+    return pageHead({
+      title: `Tennis and pickleball courts in ${city}, GA | Rally`,
+      description: names
+        ? `Tennis and pickleball in ${city}, Georgia. ${names}. Hours, fees, who books the court, and coaches on Rally.`
+        : `Find tennis and pickleball courts in ${city}, Georgia.`,
+      path: `/where/${loaderData?.slug ?? ""}`,
+    });
   },
   component: CityPage,
 });

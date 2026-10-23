@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { NOINDEX } from "@/lib/seo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
@@ -17,6 +18,7 @@ import { consumeAppNext, rememberAppNext } from "@/lib/rally";
 import { claimStudent, listHousehold, lookupClaim } from "@/lib/students-server";
 
 export const Route = createFileRoute("/claim/$code")({
+  head: () => ({ meta: [{ title: "Rally" }, NOINDEX] }),
   component: ClaimPage,
 });
 

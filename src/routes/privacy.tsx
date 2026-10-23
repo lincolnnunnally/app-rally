@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { RallyWordmark } from "@/components/brand";
 
 export const Route = createFileRoute("/privacy")({
-  head: () => ({
-    meta: [{ title: "Privacy — Rally" }],
-  }),
+  head: () =>
+    pageHead({
+      title: "Privacy — Rally",
+      description: "How Rally handles your account, player card, and lesson data: what we collect, how we use it, who sees it, and how to close your account.",
+      path: "/privacy",
+    }),
   component: PrivacyPage,
 });
 

@@ -2,17 +2,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   COACH_CARD_PCT,
-  COACH_YEAR_CENTS,
-  annualFeeDue,
-  annualRenewsOn,
   lessonCardTakeCents,
   parsePaidVia,
 } from "./coach-fee.ts";
 
 describe("decided coach pricing", () => {
-  it("is $100/yr + 5% card", () => {
-    assert.equal(COACH_YEAR_CENTS, 10000);
+  it("is pay as you go: 5% card, no annual or monthly fee", async () => {
     assert.equal(COACH_CARD_PCT, 5);
+    const mod = await import("./coach-fee.ts");
+    for (const gone of ["COACH_YEAR_CENTS", "COACH_YEAR_DAYS", "annualFeeDue", "annualRenewsOn"]) {
+      assert.equal(gone in mod, false, `${gone} should be gone`);
+    }
   });
 });
 
@@ -41,22 +41,5 @@ describe("parsePaidVia", () => {
     assert.equal(parsePaidVia("venmo"), "venmo");
     assert.equal(parsePaidVia("stripe"), null);
     assert.equal(parsePaidVia(null), null);
-  });
-});
-
-describe("annual fee", () => {
-  const now = new Date("2026-10-16T12:00:00Z");
-  it("is due when never recorded", () => {
-    assert.equal(annualFeeDue(null, now), true);
-  });
-  it("is not due within a year", () => {
-    assert.equal(annualFeeDue(new Date("2026-01-01T00:00:00Z"), now), false);
-  });
-  it("is due after 365 days", () => {
-    assert.equal(annualFeeDue(new Date("2025-10-16T12:00:00Z"), now), true);
-  });
-  it("reports the renewal date", () => {
-    assert.equal(annualRenewsOn(new Date("2026-01-01T00:00:00Z")), "2027-01-01");
-    assert.equal(annualRenewsOn(null), null);
   });
 });

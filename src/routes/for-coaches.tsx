@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CoachPricing } from "@/components/coach-pricing";
 import { ServicePage } from "@/components/service-page";
-import { RALLY, money } from "@/lib/rally";
+import { RALLY } from "@/lib/rally";
 import { SITE_URL, pageHead, serviceLd } from "@/lib/seo";
 
 const PATH = "/for-coaches";
 const TITLE = "Tennis and pickleball coach scheduling app | Rally";
-const DESCRIPTION = `A coach desk for tennis and pickleball coaches: public page, lesson menu, requests, recurring lessons, roster, and books. ${money(RALLY.coachYearCents)} a year plus ${RALLY.coachCardPct}% on card payments.`;
+const DESCRIPTION = `A coach desk for tennis and pickleball coaches: public page, lesson menu, requests, recurring lessons, roster, and books. Pay as you go: no annual or monthly fee; Rally keeps ${RALLY.coachCardPct}% of each card payment plus card processing.`;
 
 export const Route = createFileRoute("/for-coaches")({
   head: () =>
@@ -24,15 +24,8 @@ export const Route = createFileRoute("/for-coaches")({
           offers: {
             "@type": "Offer",
             url: `${SITE_URL}${PATH}`,
-            price: (RALLY.coachYearCents / 100).toFixed(2),
             priceCurrency: "USD",
-            description: `${money(RALLY.coachYearCents)} a year plus ${RALLY.coachCardPct}% of each lesson paid by credit card. Cash App and Venmo payments: 0%.`,
-            priceSpecification: {
-              "@type": "UnitPriceSpecification",
-              price: (RALLY.coachYearCents / 100).toFixed(2),
-              priceCurrency: "USD",
-              unitText: "year",
-            },
+            description: `Pay as you go. No annual or monthly fee. Rally keeps ${RALLY.coachCardPct}% of each lesson paid by credit card, plus the card processing fee. Cash App and Venmo payments: 0%.`,
           },
         }),
       ],

@@ -56,7 +56,7 @@ function FreeAccessAdmin() {
       <p className="text-xs tracking-widest text-muted-foreground uppercase">Owner</p>
       <h1 className="mt-1 font-display text-3xl">Free coach access</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Coaches on this list record no Rally fee: no $100 year, no card 5%. Ledger only — no money
+        Coaches on this list record no Rally fee: no card 5%. Ledger only — no money
         moves.
       </p>
       <Card className="mt-6">

@@ -1,4 +1,4 @@
-import { COACH_CARD_PCT, COACH_YEAR_CENTS, type PaidVia } from "./coach-fee.ts";
+import { COACH_CARD_PCT, type PaidVia } from "./coach-fee.ts";
 export const SPORTS = ["pickleball", "tennis"] as const;
 export type Sport = (typeof SPORTS)[number];
 
@@ -49,8 +49,7 @@ export const RALLY = {
   leaguePct: 10,
   facilityPct: 10,
   referralPct: 25,
-  /** Decided coach pricing: $100/yr + 5% on card lessons only (see coach-fee.ts). */
-  coachYearCents: COACH_YEAR_CENTS,
+  /** Decided coach pricing: pay as you go, 5% on card lessons plus processing, no annual or monthly fee (see coach-fee.ts). */
   coachCardPct: COACH_CARD_PCT,
 } as const;
 
@@ -614,11 +613,9 @@ export type Advice = {
 };
 
 export type CoachBilling = {
-  plan: "annual";
-  year_cents: number;
+  /** No annual or monthly fee. */
+  plan: "pay_as_you_go";
   card_pct: number;
-  /** Next annual fee date, or null before the first one is recorded. */
-  annual_renews_on: string | null;
   take_this_month: number;
   cash_app_handle: string | null;
   venmo_handle: string | null;

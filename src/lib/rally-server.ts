@@ -16,7 +16,7 @@ import type {
   ReviewRow,
 } from "@/lib/rally";
 import { cleanCashAppHandle, cleanVenmoHandle } from "@/lib/pay-href";
-import { COACH_CARD_PCT, COACH_YEAR_CENTS, PAID_VIA, annualFeeDue, annualRenewsOn, lessonCardTakeCents, parsePaidVia } from "@/lib/coach-fee";
+import { COACH_CARD_PCT, PAID_VIA, lessonCardTakeCents, parsePaidVia } from "@/lib/coach-fee";
 import { canActorSaveLessonNotes, LESSON_NOTES_MAX, lessonNotesNotice } from "@/lib/lesson-notes";
 import {
   assertLessonVideoChoice,
@@ -671,49 +671,15 @@ function mapProof(r: Record<string, unknown>, sessions?: number): PlayerProof {
 		photo_data: r.photo_data == null ? null : String(r.photo_data)
 	};
 }
-function billingOf(lastAnnual: unknown, takeThisMonth: number): CoachBilling {
-	let last: Date | null = null;
-	if (lastAnnual instanceof Date && !Number.isNaN(lastAnnual.getTime())) last = lastAnnual;
-	else if (lastAnnual != null && String(lastAnnual).trim() !== "") {
-		const d = new Date(String(lastAnnual).replace(" ", "T"));
-		last = Number.isNaN(d.getTime()) ? null : d;
-	}
+/** Pay as you go: no annual or monthly fee, Rally 5% on card lessons (processing passed through). */
+function billingOf(takeThisMonth: number): CoachBilling {
 	return {
-		plan: "annual",
-		year_cents: COACH_YEAR_CENTS,
+		plan: "pay_as_you_go",
 		card_pct: COACH_CARD_PCT,
-		annual_renews_on: annualRenewsOn(last),
 		take_this_month: takeThisMonth,
 		cash_app_handle: null,
 		venmo_handle: null
 	};
-}
-async function lastAnnualFeeAt(sql: Sql, coach: string) {
-	return (await sql`
-    select max(created_at) as at from coach_ledger
-    where coach_user_id = ${coach} and category = 'rally_annual'
-  `)[0]?.at ?? null;
-}
-/** $100/yr coach fee, recorded once per 365 days on the ledger. No money moves. */
-async function recordAnnualFeeIfDue(sql: Sql, coach: string, lessonId: number) {
-	const last = await lastAnnualFeeAt(sql, coach);
-	const lastDate = last instanceof Date ? last : last == null ? null : new Date(String(last).replace(" ", "T"));
-	if (!annualFeeDue(lastDate)) return;
-	const settled = await settleTake(sql, {
-		kind: "coach_annual",
-		payerUserId: coach,
-		scheduled: COACH_YEAR_CENTS,
-		relatedId: lessonId,
-		note: "Rally coach year"
-	});
-	if (settled.take + settled.creditUsed > 0) await sql`
-      insert into coach_ledger (coach_user_id, kind, category, amount_cents, note, lesson_id)
-      values (
-        ${coach}, 'expense', 'rally_annual', ${settled.take},
-        ${settled.creditUsed ? "Rally coach year · share credit applied" : "Rally coach year"},
-        ${lessonId}
-      )
-    `;
 }
 /**
  * Make the lesson's Rally card take match its payment method: 5% on card (no cap), 0 otherwise.
@@ -1504,7 +1470,7 @@ export const getCoachDesk = createServerFn({ method: "GET" }).middleware([authMi
         and occurred_on >= date_trunc('month', current_date)
     `;
 	const billing = {
-		...billingOf(await lastAnnualFeeAt(sql, context.userId), num(takeMonth[0]?.n ?? 0)),
+		...billingOf(num(takeMonth[0]?.n ?? 0)),
 		cash_app_handle: coach[0]?.cash_app_handle == null || String(coach[0].cash_app_handle).trim() === ""
 			? null
 			: String(coach[0].cash_app_handle),
@@ -2248,7 +2214,6 @@ export const setLessonStatus = createServerFn({ method: "POST" }).middleware([au
         `;
 		const facilityTake = takeCents(fee, RALLY.facilityPct) + takeCents(cut, RALLY.facilityPct);
 		if (facilityTake > 0) await recordTake(sql, "facility", facilityTake, coach, data.id, "Rally share of facility fee/cut");
-		await recordAnnualFeeIfDue(sql, coach, data.id);
 		await syncLessonCardTake(sql, data.id);
 		const other = context.userId === coach ? player : coach;
 		await notify(

@@ -45,6 +45,13 @@ describe("reserved sign-up emails", () => {
     assert.equal(isReservedSignupEmail("owner@example.com", { APP_ENGINE_OWNER_EMAIL: "owner@example.com" }), true);
     assert.equal(isReservedSignupEmail("lincoln@unitedundergod.org", { APP_ENGINE_OWNER_EMAIL: "owner@example.com" }), true);
   });
+  it("reserves lincoln.nunnally@gmail.com from password sign-up", () => {
+    assert.equal(isReservedSignupEmail("lincoln.nunnally@gmail.com", {}), true);
+    assert.equal(
+      isReservedSignupEmail(" Lincoln.Nunnally@Gmail.com ", { APP_ENGINE_OWNER_EMAIL: "owner@example.com" }),
+      true,
+    );
+  });
   it("leaves normal addresses alone", () => {
     assert.equal(isReservedSignupEmail("coach@example.com", {}), false);
     assert.equal(isReservedSignupEmail("", {}), false);

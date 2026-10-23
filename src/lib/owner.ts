@@ -16,7 +16,10 @@ export const RALLY_OWNER_EMAILS = [
  * Addresses nobody may self-register with a password. They can only come into Rally
  * through the verified GoTrue owner bridge (real LPL password, confirmed email).
  */
-export const RESERVED_SIGNUP_EMAILS = ["lincoln@unitedundergod.org"] as const;
+export const RESERVED_SIGNUP_EMAILS = [
+  "lincoln@unitedundergod.org",
+  "lincoln.nunnally@gmail.com",
+] as const;
 
 export type EnvLike = Record<string, string | undefined>;
 

@@ -2,12 +2,15 @@
 export const DEFAULT_OWNER_EMAIL = "lincoln@unitedundergod.org";
 
 /**
- * Rally owner-screen accounts. Only addresses that are already a registered Rally
- * account belong here (verified 2026-10-16: lincoln.nunnally@gmail.com). Matched on the
- * session email on every server call. APP_ENGINE_OWNER_EMAIL does NOT grant owner
+ * Rally owner-screen accounts. lincoln@unitedundergod.org is the app owner;
+ * lincoln.nunnally@gmail.com stays. Matched on the session email (trimmed and
+ * lowercased) on every server call. APP_ENGINE_OWNER_EMAIL does NOT grant owner
  * privileges in the app; it only names the GoTrue sign-in bridge address.
  */
-export const RALLY_OWNER_EMAILS = ["lincoln.nunnally@gmail.com"] as const;
+export const RALLY_OWNER_EMAILS = [
+  "lincoln@unitedundergod.org",
+  "lincoln.nunnally@gmail.com",
+] as const;
 
 /**
  * Addresses nobody may self-register with a password. They can only come into Rally
@@ -35,7 +38,7 @@ export function isOwnerEmail(
 export function isAppOwnerEmail(email: string | null | undefined): boolean {
   const value = email?.trim().toLowerCase();
   if (!value) return false;
-  return (RALLY_OWNER_EMAILS as readonly string[]).includes(value);
+  return RALLY_OWNER_EMAILS.some((owner) => owner.trim().toLowerCase() === value);
 }
 
 /** True when a password sign-up / email change to this address must be refused. */

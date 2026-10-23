@@ -24,9 +24,13 @@ describe("owner email", () => {
 });
 
 describe("app owner emails", () => {
-  it("accepts only the registered account, case-insensitively", () => {
+  it("keeps lincoln@unitedundergod.org and lincoln.nunnally@gmail.com as app owners", () => {
+    assert.equal(isAppOwnerEmail("lincoln@unitedundergod.org"), true);
+    assert.equal(isAppOwnerEmail("lincoln.nunnally@gmail.com"), true);
+  });
+  it("compares owner emails trimmed and lowercased", () => {
     assert.equal(isAppOwnerEmail(" Lincoln.Nunnally@Gmail.com "), true);
-    assert.equal(isAppOwnerEmail("lincoln@unitedundergod.org"), false);
+    assert.equal(isAppOwnerEmail(" Lincoln@UnitedUnderGod.org "), true);
   });
   it("rejects everyone else", () => {
     for (const e of ["qa@mailinator.com", "lincoln@gmail.com", "lincoln.nunnally@gmail.com.evil.io", "", null, undefined]) {

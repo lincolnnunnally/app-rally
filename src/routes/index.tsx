@@ -3,7 +3,7 @@ import { RallyWordmark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { catalogCities, catalogCity } from "@/lib/rally-server";
-import { bookingLabel, citySlug, kindLabel, sportLabel } from "@/lib/rally";
+import { RALLY, bookingLabel, citySlug, kindLabel, sportLabel } from "@/lib/rally";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { ServiceLinks } from "@/components/service-links";
 import { SITE_URL, pageHead } from "@/lib/seo";
@@ -205,8 +205,9 @@ function Home() {
             <h2 className="font-display text-3xl">If you coach</h2>
             <p className={`mt-3 ${MUTED}`}>
               A menu, not one hourly rate. Players who credit you put results on your card.
-              Recurring lessons and the books live on your desk. $100 a year plus 5% on card
-              payments; Cash App and Venmo payments are free.
+              Recurring lessons and the books live on your desk. No annual or monthly fee: Rally
+              keeps {RALLY.coachCardPct}% of each card payment plus card processing; Cash App and Venmo
+              payments are free.
             </p>
             <Button asChild className={`mt-6 ${BTN}`}>
               {user ? (

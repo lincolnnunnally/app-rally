@@ -50,8 +50,9 @@ function TermsPage() {
         </ul>
         <h2 className="font-display text-xl text-foreground">3. Money</h2>
         <p>
-          Players use Rally free. Coaches pay $100 a year plus 5% of lessons paid by credit card
-          (no cap); Cash App and Venmo payments carry no Rally fee. Facilities pay a percentage of
+          Players use Rally free. Coaches pay no annual or monthly fee. Rally keeps 5% of each
+          lesson paid by credit card (no cap), plus the card processing fee; Cash App and Venmo
+          payments carry no Rally fee. Facilities pay a percentage of
           paid bookings and league fees; courts at $0 stay $0. Card checkout is not live yet — we do
           not take payment in the app today. Do not send Rally money expecting automated collection.
         </p>

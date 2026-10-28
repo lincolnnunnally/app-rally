@@ -3,7 +3,7 @@ import {
   Brain,
   GraduationCap,
   PenLine,
-  TrendingDown,
+  TrendingUp,
   Trophy,
   UserRound,
   Users,
@@ -107,9 +107,9 @@ const LINKS = [
   },
   {
     to: "/app/progress" as const,
-    icon: TrendingDown,
-    title: "I have stalled",
-    body: "Beginner basics, or you have outgrown this coach.",
+    icon: TrendingUp,
+    title: "My growth",
+    body: "Where you started, where you are now. Or: I have stalled.",
   },
   {
     to: "/app/desk" as const,

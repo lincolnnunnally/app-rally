@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { STALL_AREAS, stallAdvice, type Advice } from "@/lib/rally";
 import { saveStall } from "@/lib/rally-server";
+import { myGrowthPages } from "@/lib/growth-server";
 
 export const Route = createFileRoute("/app/progress")({ component: Progress });
 
@@ -29,7 +30,8 @@ function Progress() {
 
   return (
     <div className="px-5 py-8">
-      <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Progress</p>
+      <GrowthPages />
+      <p className="mt-10 text-xs tracking-[0.2em] text-muted-foreground uppercase">Progress</p>
       <h1 className="mt-2 font-display text-4xl">I have stalled</h1>
       <p className="mt-2 max-w-lg text-sm text-muted-foreground">
         New to the game, or you already know everything your current coach has to
@@ -105,5 +107,40 @@ function Progress() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Self first, then each kid this account guards. */
+function GrowthPages() {
+  const pages = useQuery({ queryKey: ["growth-pages"], queryFn: () => myGrowthPages() });
+  const rows = (pages.data ?? []).filter((p) => p.self || p.lessons > 0 || p.ratings > 0);
+  return (
+    <section>
+      <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">Progress</p>
+      <h1 className="mt-2 font-display text-4xl">Am I getting better?</h1>
+      <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+        It is hard to feel from inside one lesson. Your growth page puts where you started next to
+        where you are now — your coach&apos;s notes, what went right, and what you wrote after each
+        lesson.
+      </p>
+      <div className="mt-6 grid gap-3">
+        {rows.map((p) => (
+          <Card key={p.user_id} className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-medium">{p.self ? "You" : p.display_name}</p>
+              <p className="text-sm text-muted-foreground">
+                {p.lessons} {p.lessons === 1 ? "lesson" : "lessons"} on file
+                {p.ratings > 0 ? " · starting point written" : ""}
+              </p>
+            </div>
+            <Button asChild variant={p.lessons > 0 || p.ratings > 0 ? "default" : "secondary"}>
+              <Link to="/app/students/$id" params={{ id: p.user_id }}>
+                See growth
+              </Link>
+            </Button>
+          </Card>
+        ))}
+      </div>
+    </section>
   );
 }

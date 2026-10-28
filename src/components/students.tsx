@@ -317,9 +317,9 @@ export function ScheduleChildForm({
         </Select>
       </Field>
       <Field label="Sport">
-        <Select name="sport" defaultValue="pickleball">
-          <option value="pickleball">Pickleball</option>
+        <Select name="sport" defaultValue="tennis">
           <option value="tennis">Tennis</option>
+          <option value="pickleball">Pickleball</option>
         </Select>
       </Field>
       <Field label="When">

@@ -79,7 +79,9 @@ function NotACoach({
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
         <Button asChild>
-          <Link to="/app/coaches">Find a coach</Link>
+          <Link to="/app/coaches" search={{ fit: "all" }}>
+            Find a coach
+          </Link>
         </Button>
         {!start ? (
           <Button variant="outline" onClick={() => setStart(true)}>
@@ -743,6 +745,7 @@ type RosterStudent = {
   claimed: boolean;
   guardian_user_id?: string | null;
   guardians?: { user_id: string; name: string; relation: string; primary: boolean }[];
+  has_start?: boolean;
 };
 
 function StudentsPanel({ students, onSaved }: { students: RosterStudent[]; onSaved: () => void }) {
@@ -771,6 +774,12 @@ function StudentsPanel({ students, onSaved }: { students: RosterStudent[]; onSav
               <li key={student.user_id} className="rounded-md border border-border px-3 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium">{student.display_name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                  <Button asChild size="sm" variant={student.has_start ? "secondary" : "default"}>
+                    <Link to="/app/students/$id" params={{ id: student.user_id }}>
+                      {student.has_start ? "Growth" : "Write starting point"}
+                    </Link>
+                  </Button>
                   {student.claimed ? (
                     <Badge variant="good">Claimed</Badge>
                   ) : accountless ? (
@@ -778,6 +787,7 @@ function StudentsPanel({ students, onSaved }: { students: RosterStudent[]; onSav
                   ) : (
                     <Badge variant="outline">Own account</Badge>
                   )}
+                  </div>
                 </div>
                 {guardians.length > 0 ? (
                   <ul className="mt-1 flex flex-col gap-1">
@@ -979,8 +989,8 @@ function LinkGuardianForm({
 function AddStudentForm({ onAdded }: { onAdded: (userId: string) => void }) {
   const [sent, setSent] = useState<{ name: string; code: string; email: string } | null>(null);
   const save = useMutation({
-    mutationFn: (v: { display_name: string; email: string }) =>
-      createStudent({ data: { display_name: v.display_name } }),
+    mutationFn: (v: { display_name: string; email: string; sport: "tennis" | "pickleball" | "both" }) =>
+      createStudent({ data: { display_name: v.display_name, sport: v.sport } }),
     onSuccess: (row, vars) => {
       toast.success(`${row.display_name} added. Share the claim link with a parent.`);
       setSent({ name: row.display_name, code: row.claim_code, email: vars.email });
@@ -991,7 +1001,7 @@ function AddStudentForm({ onAdded }: { onAdded: (userId: string) => void }) {
   return (
     <div>
       <form
-        className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
+        className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
@@ -1001,6 +1011,7 @@ function AddStudentForm({ onAdded }: { onAdded: (userId: string) => void }) {
           save.mutate({
             display_name: last ? `${first} ${last}` : first,
             email: String(f.get("parent_email") || "").trim(),
+            sport: String(f.get("sport") || "tennis") as "tennis" | "pickleball" | "both",
           });
           e.currentTarget.reset();
         }}
@@ -1013,6 +1024,13 @@ function AddStudentForm({ onAdded }: { onAdded: (userId: string) => void }) {
         </Field>
         <Field label="Parent email (optional)">
           <Input name="parent_email" type="email" placeholder="parent@email.com" />
+        </Field>
+        <Field label="Sport">
+          <Select name="sport" defaultValue="tennis">
+            <option value="tennis">Tennis</option>
+            <option value="pickleball">Pickleball</option>
+            <option value="both">Both</option>
+          </Select>
         </Field>
         <Button type="submit" disabled={save.isPending}>
           {save.isPending ? "Saving…" : "Add student"}

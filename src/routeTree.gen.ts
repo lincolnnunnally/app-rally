@@ -47,6 +47,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppLeaguesIndexRouteImport } from './routes/app/leagues.index'
 import { Route as AppLeaguesIdRouteImport } from './routes/app/leagues.$id'
 import { Route as AppLessonsIdRouteImport } from './routes/app/lessons.$id'
+import { Route as AppStudentsIdRouteImport } from './routes/app/students.$id'
 import { Route as WhereCityIndexRouteImport } from './routes/where.$city.index'
 import { Route as WhereCitySlugRouteImport } from './routes/where.$city.$slug'
 
@@ -240,6 +241,11 @@ const AppLessonsIdRoute = AppLessonsIdRouteImport.update({
   path: '/lessons/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStudentsIdRoute = AppStudentsIdRouteImport.update({
+  id: '/students/$id',
+  path: '/students/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const WhereCityIndexRoute = WhereCityIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -289,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
+  '/app/students/$id': typeof AppStudentsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues/': typeof AppLeaguesIndexRoute
   '/where/$city/': typeof WhereCityIndexRoute
@@ -327,6 +334,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
+  '/app/students/$id': typeof AppStudentsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues': typeof AppLeaguesIndexRoute
   '/where/$city': typeof WhereCityIndexRoute
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
   '/app/lessons/$id': typeof AppLessonsIdRoute
+  '/app/students/$id': typeof AppStudentsIdRoute
   '/where/$city/$slug': typeof WhereCitySlugRoute
   '/app/leagues/': typeof AppLeaguesIndexRoute
   '/where/$city/': typeof WhereCityIndexRoute
@@ -414,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
+    | '/app/students/$id'
     | '/where/$city/$slug'
     | '/app/leagues/'
     | '/where/$city/'
@@ -452,6 +462,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
+    | '/app/students/$id'
     | '/where/$city/$slug'
     | '/app/leagues'
     | '/where/$city'
@@ -494,6 +505,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/app/leagues/$id'
     | '/app/lessons/$id'
+    | '/app/students/$id'
     | '/where/$city/$slug'
     | '/app/leagues/'
     | '/where/$city/'
@@ -791,6 +803,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLessonsIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/students/$id': {
+      id: '/app/students/$id'
+      path: '/students/$id'
+      fullPath: '/app/students/$id'
+      preLoaderRoute: typeof AppStudentsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/where/$city/': {
       id: '/where/$city/'
       path: '/'
@@ -836,6 +855,7 @@ interface AppRouteChildren {
   AppYouRoute: typeof AppYouRoute
   AppIndexRoute: typeof AppIndexRoute
   AppLessonsIdRoute: typeof AppLessonsIdRoute
+  AppStudentsIdRoute: typeof AppStudentsIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -852,6 +872,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppYouRoute: AppYouRoute,
   AppIndexRoute: AppIndexRoute,
   AppLessonsIdRoute: AppLessonsIdRoute,
+  AppStudentsIdRoute: AppStudentsIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

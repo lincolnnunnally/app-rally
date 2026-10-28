@@ -41,7 +41,7 @@ import {
 } from "@/lib/schedule-server";
 import { publicFromCents, rosterServiceNotice, serviceIsPublic } from "@/lib/service-visibility";
 import { RALLY, citySlug, money, parseCerts, parseHonors, priceLine, slugify, takeCents } from "@/lib/rally";
-import { assertCoachCanSchedulePlayer, coachStudents, connectCoach, profileDisplayName, resolveScheduledPlayer } from "@/lib/students-server";
+import { assertCoachCanSchedulePlayer, coachStudents, connectCoach, isGuardianOf, profileDisplayName, resolveScheduledPlayer } from "@/lib/students-server";
 import { applyPublicMask, parseCoachIds, parsePublicFields, privateNotesForViewer, publicFieldsToText } from "@/lib/students";
 
 export type { ReviewRow };
@@ -1738,10 +1738,7 @@ export const getLessonScan = createServerFn({ method: "GET" }).middleware([authM
 	if (context.userId === lesson.coach_user_id) role = "coach";
 	else if (context.userId === lesson.player_user_id) role = "player";
 	else {
-		const guardian = (await sql`
-      select guardian_user_id from profiles where user_id = ${lesson.player_user_id} limit 1
-    `)[0];
-		if (!guardian || String(guardian.guardian_user_id ?? "") !== context.userId) {
+		if (!(await isGuardianOf(sql, context.userId, lesson.player_user_id))) {
 			throw new Error("This lesson is not yours.");
 		}
 		role = "guardian";

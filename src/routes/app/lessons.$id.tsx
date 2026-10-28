@@ -6,6 +6,7 @@ import { CancelLessonButton, LessonScheduleActions } from "@/components/lesson-s
 import { LessonVideoEditor, LessonVideoRead } from "@/components/lesson-video";
 import { LessonScanQr, PayHandleShow } from "@/components/share-rally";
 import { LessonSuccesses } from "@/components/lesson-successes";
+import { LessonReflectionCard } from "@/components/growth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -115,6 +116,8 @@ function LessonScan() {
       </Card>
 
       <LessonSuccesses lessonId={l.id} />
+
+      <LessonReflectionCard lessonId={l.id} />
 
       {role === "guardian" ? null : (
         <Card className="mt-6">

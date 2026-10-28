@@ -105,7 +105,8 @@ export async function profileDisplayName(sql: Sql, userId: string, fallback: str
 export async function coachStudents(sql: Sql, coachId: string) {
   const rows = await sql`
     select p.user_id, p.display_name, p.city, p.claim_code, p.guardian_user_id,
-           p.plays_tennis, p.plays_pickleball
+           p.plays_tennis, p.plays_pickleball,
+           exists (select 1 from student_assessments a where a.student_id = p.user_id) as has_start
     from profiles p
     where p.user_id <> ${coachId}
       and p.user_id not like 'seed:%'
@@ -150,6 +151,7 @@ export async function coachStudents(sql: Sql, coachId: string) {
     plays_tennis: row.plays_tennis === true || row.plays_tennis === "t" || row.plays_tennis === "true",
     plays_pickleball:
       row.plays_pickleball === true || row.plays_pickleball === "t" || row.plays_pickleball === "true",
+    has_start: row.has_start === true || row.has_start === "t" || row.has_start === "true",
   }));
 }
 
@@ -162,20 +164,29 @@ const nameZ = z.string().trim().min(1).max(80);
 
 export const createStudent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ display_name: nameZ }))
+  .validator(
+    z.object({
+      display_name: nameZ,
+      sport: z.enum(["tennis", "pickleball", "both"]).optional(),
+    }),
+  )
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     await markCoach(sql, context.userId);
     const userId = newStudentUserId();
     const code = newClaimCode();
     const coaches = JSON.stringify([context.userId]);
+    // No sport given keeps the old default (pickleball) for existing callers.
+    const plays = data.sport ?? "pickleball";
+    const playsTennis = plays !== "pickleball";
+    const playsPickleball = plays !== "tennis";
     await sql`
       insert into profiles (
         user_id, display_name, city, onboarded, plays_pickleball, plays_tennis,
         looking_for_partners, looking_for_coach, interested_in_leagues, is_coach,
         claim_code, coach_user_ids, public_fields
       ) values (
-        ${userId}, ${data.display_name}, 'Vidalia', false, true, false,
+        ${userId}, ${data.display_name}, 'Vidalia', false, ${playsPickleball}, ${playsTennis},
         false, false, false, false,
         ${code}, ${coaches}, ''
       )

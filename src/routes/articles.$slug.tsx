@@ -22,7 +22,7 @@ export const Route = createFileRoute("/articles/$slug")({
     const path = `/articles/${a.slug}`;
     const description = (a.seo_description || a.excerpt || `${a.title}. A coaching article on Rally.`).slice(0, 300);
     return pageHead({
-      title: `${a.seo_title || a.title} | Rally`,
+      title: articleTitle(a.seo_title || a.title),
       description,
       path,
       ogType: "article",
@@ -49,6 +49,20 @@ export const Route = createFileRoute("/articles/$slug")({
   notFoundComponent: ArticleNotFound,
   component: ArticlePage,
 });
+
+/** "<title> | Rally", kept to 65 characters by trimming the title at a word boundary. */
+function articleTitle(raw: string) {
+  const suffix = " | Rally";
+  const max = 65 - suffix.length;
+  let t = raw.trim();
+  if (t.length > max) {
+    t = t.slice(0, max - 1);
+    const cut = t.lastIndexOf(" ");
+    if (cut > 20) t = t.slice(0, cut);
+    t = `${t.replace(/[\s,;:.-]+$/, "")}…`;
+  }
+  return `${t}${suffix}`;
+}
 
 function ArticleNotFound() {
   return (

@@ -34,19 +34,21 @@ export function pageHead({
   path,
   noindex = false,
   jsonLd = [],
+  ogType = "website",
 }: {
   title: string;
   description: string;
   path: string;
   noindex?: boolean;
   jsonLd?: object[];
+  ogType?: "website" | "article";
 }): { meta: Meta[]; links: { rel: string; href: string }[] } {
   const url = absoluteUrl(path);
   return {
     meta: [
       { title },
       { name: "description", content: description },
-      { property: "og:type", content: "website" },
+      { property: "og:type", content: ogType },
       { property: "og:site_name", content: SITE_NAME },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
@@ -106,5 +108,6 @@ export const SERVICE_PAGES = [
   { path: "/leagues", label: "Leagues and ladders" },
   { path: "/get-better", label: "Get unstuck and play calmer" },
   { path: "/for-coaches", label: "For coaches: a coach desk" },
+  { path: "/articles", label: "Coaching articles" },
   { path: "/list-a-court", label: "For facilities: list a court" },
 ] as const;

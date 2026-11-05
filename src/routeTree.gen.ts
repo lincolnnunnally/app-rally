@@ -38,6 +38,8 @@ import { Route as AppPlayRouteImport } from './routes/app/play'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
 import { Route as AppProgressRouteImport } from './routes/app/progress'
 import { Route as AppYouRouteImport } from './routes/app/you'
+import { Route as ArticlesIndexRouteImport } from './routes/articles.index'
+import { Route as ArticlesSlugRouteImport } from './routes/articles.$slug'
 import { Route as BookCodeRouteImport } from './routes/book.$code'
 import { Route as ClaimCodeRouteImport } from './routes/claim.$code'
 import { Route as CoachCodeRouteImport } from './routes/coach.$code'
@@ -196,6 +198,16 @@ const AppYouRoute = AppYouRouteImport.update({
   path: '/you',
   getParentRoute: () => AppRoute,
 } as any)
+const ArticlesIndexRoute = ArticlesIndexRouteImport.update({
+  id: '/articles/',
+  path: '/articles/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArticlesSlugRoute = ArticlesSlugRouteImport.update({
+  id: '/articles/$slug',
+  path: '/articles/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookCodeRoute = BookCodeRouteImport.update({
   id: '/book/$code',
   path: '/book/$code',
@@ -286,11 +298,13 @@ export interface FileRoutesByFullPath {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/articles/$slug': typeof ArticlesSlugRoute
   '/book/$code': typeof BookCodeRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/coach/$code': typeof CoachCodeRoute
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
+  '/articles/': typeof ArticlesIndexRoute
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
@@ -326,10 +340,12 @@ export interface FileRoutesByTo {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/articles/$slug': typeof ArticlesSlugRoute
   '/book/$code': typeof BookCodeRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/coach/$code': typeof CoachCodeRoute
   '/app': typeof AppIndexRoute
+  '/articles': typeof ArticlesIndexRoute
   '/where': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
@@ -369,11 +385,13 @@ export interface FileRoutesById {
   '/app/profile': typeof AppProfileRoute
   '/app/progress': typeof AppProgressRoute
   '/app/you': typeof AppYouRoute
+  '/articles/$slug': typeof ArticlesSlugRoute
   '/book/$code': typeof BookCodeRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/coach/$code': typeof CoachCodeRoute
   '/where/$city': typeof WhereCityRouteWithChildren
   '/app/': typeof AppIndexRoute
+  '/articles/': typeof ArticlesIndexRoute
   '/where/': typeof WhereIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/leagues/$id': typeof AppLeaguesIdRoute
@@ -414,11 +432,13 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/articles/$slug'
     | '/book/$code'
     | '/claim/$code'
     | '/coach/$code'
     | '/where/$city'
     | '/app/'
+    | '/articles/'
     | '/where/'
     | '/api/auth/$'
     | '/app/leagues/$id'
@@ -454,10 +474,12 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/articles/$slug'
     | '/book/$code'
     | '/claim/$code'
     | '/coach/$code'
     | '/app'
+    | '/articles'
     | '/where'
     | '/api/auth/$'
     | '/app/leagues/$id'
@@ -496,11 +518,13 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/progress'
     | '/app/you'
+    | '/articles/$slug'
     | '/book/$code'
     | '/claim/$code'
     | '/coach/$code'
     | '/where/$city'
     | '/app/'
+    | '/articles/'
     | '/where/'
     | '/api/auth/$'
     | '/app/leagues/$id'
@@ -529,9 +553,11 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   WhereRoute: typeof WhereRouteWithChildren
+  ArticlesSlugRoute: typeof ArticlesSlugRoute
   BookCodeRoute: typeof BookCodeRoute
   ClaimCodeRoute: typeof ClaimCodeRoute
   CoachCodeRoute: typeof CoachCodeRoute
+  ArticlesIndexRoute: typeof ArticlesIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -740,6 +766,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppYouRouteImport
       parentRoute: typeof AppRoute
     }
+    '/articles/': {
+      id: '/articles/'
+      path: '/articles'
+      fullPath: '/articles/'
+      preLoaderRoute: typeof ArticlesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/articles/$slug': {
+      id: '/articles/$slug'
+      path: '/articles/$slug'
+      fullPath: '/articles/$slug'
+      preLoaderRoute: typeof ArticlesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/book/$code': {
       id: '/book/$code'
       path: '/book/$code'
@@ -921,9 +961,11 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   WhereRoute: WhereRouteWithChildren,
+  ArticlesSlugRoute: ArticlesSlugRoute,
   BookCodeRoute: BookCodeRoute,
   ClaimCodeRoute: ClaimCodeRoute,
   CoachCodeRoute: CoachCodeRoute,
+  ArticlesIndexRoute: ArticlesIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

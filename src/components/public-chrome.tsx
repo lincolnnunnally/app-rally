@@ -30,6 +30,9 @@ export function PublicChrome({
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <Link to="/coaches">Find a coach</Link>
           </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Link to="/articles">Articles</Link>
+          </Button>
           {!isPending && user ? (
             <Button asChild>
               <Link to="/app">Open Rally</Link>

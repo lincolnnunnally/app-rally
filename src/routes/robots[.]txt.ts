@@ -17,12 +17,14 @@ Allow: /find-a-partner
 Allow: /leagues
 Allow: /get-better
 Allow: /for-coaches
+Allow: /articles
 Allow: /privacy
 Allow: /terms
 Disallow: /app
 Disallow: /api
 Disallow: /login
 Sitemap: ${SITE_URL}/sitemap.xml
+Sitemap: ${SITE_URL}/sitemap-articles.xml
 `;
         return new Response(body, {
           headers: {

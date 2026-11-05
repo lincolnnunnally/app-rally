@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { catalogCities, catalogCity } from "@/lib/rally-server";
 import { SERVICE_PAGES, SITE_URL } from "@/lib/seo";
-import { loadArticleSummaries } from "@/lib/articles-server";
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
@@ -17,13 +16,6 @@ export const Route = createFileRoute("/sitemap.xml")({
           `${origin}/privacy`,
           `${origin}/terms`,
         ];
-        try {
-          for (const a of await loadArticleSummaries()) {
-            urls.push(`${origin}/articles/${encodeURIComponent(a.slug)}`);
-          }
-        } catch {
-          // Articles unavailable: the rest of the sitemap still serves.
-        }
         for (const city of cities) {
           urls.push(`${origin}/where/${city.slug}`);
           const detail = await catalogCity({ data: { city: city.slug } });
